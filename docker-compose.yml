@@ -23,6 +23,8 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    ports:
+      - "8000:8000"
 
 volumes:
   db_data:

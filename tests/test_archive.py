@@ -12,7 +12,7 @@ import pytest
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from archive.artist import archive_artist
-from src.db.tables import Album, ArchiveChangeLog, Artist, ArtistMember, ArtistSnapshot, Song, SongArtist
+from src.db.tables import Album, ArchiveChangeLog, Artist, ArtistMember, Song, SongArtist
 
 ARTIST_ID = "1234567"
 OTHER_CHARTING_ARTIST_ID = "9999999"
@@ -126,23 +126,6 @@ class TestArchiveArtist:
         assert len(members) == 1
         assert members[0].member_name == "Member One"
 
-    def test_appends_snapshot_for_the_requested_artist_only(self, session: Session):
-        archive_artist(session, _make_client(), ARTIST_ID)
-
-        snapshots = session.exec(
-            select(ArtistSnapshot).where(ArtistSnapshot.artist_id == ARTIST_ID)
-        ).all()
-        assert len(snapshots) == 1
-        assert snapshots[0].current_rank == 5
-        assert snapshots[0].total_fan_count == 100_000
-
-        other = session.exec(
-            select(ArtistSnapshot).where(
-                ArtistSnapshot.artist_id == OTHER_CHARTING_ARTIST_ID
-            )
-        ).all()
-        assert other == []
-
     def test_upserts_album(self, session: Session):
         archive_artist(session, _make_client(), ARTIST_ID)
 
@@ -182,12 +165,6 @@ class TestArchiveArtist:
         assert len(session.exec(select(Song)).all()) == 1
         assert len(session.exec(select(SongArtist)).all()) == 2  # not duplicated
 
-        # Snapshots are append-only: two fetches -> two rows.
-        snapshots = session.exec(
-            select(ArtistSnapshot).where(ArtistSnapshot.artist_id == ARTIST_ID)
-        ).all()
-        assert len(snapshots) == 2
-
     def test_logs_artist_field_changes(self, session: Session):
         client = _make_client()
 
@@ -224,3 +201,291 @@ class TestArchiveArtist:
 
         assert intro_change.old_value == "A test artist."
         assert intro_change.new_value == "Updated intro."
+
+    def test_does_not_create_change_log_when_nothing_changed(self, session: Session):
+        client = _make_client()
+
+        archive_artist(session, client, ARTIST_ID)
+        archive_artist(session, client, ARTIST_ID)
+
+        changes = session.exec(
+            select(ArchiveChangeLog).where(
+                ArchiveChangeLog.entity_type == "artist",
+                ArchiveChangeLog.entity_id == ARTIST_ID,
+            )
+        ).all()
+
+        assert changes == []
+
+
+    def test_updates_existing_artist_fields(self, session: Session):
+        client = _make_client()
+
+        archive_artist(session, client, ARTIST_ID)
+
+        client.get_artist_detail.return_value.intro = "new intro"
+
+        archive_artist(session, client, ARTIST_ID)
+
+        artist = session.get(Artist, ARTIST_ID)
+
+        assert artist.intro == "new intro"
+
+
+    def test_updates_existing_member_fields(self, session: Session):
+        client = _make_client()
+
+        archive_artist(session, client, ARTIST_ID)
+
+        client.get_artist_detail.return_value.member_list[0].birthday = "20000101"
+
+        archive_artist(session, client, ARTIST_ID)
+
+        member = session.exec(
+            select(ArtistMember).where(
+                ArtistMember.artist_id == ARTIST_ID
+            )
+        ).first()
+
+        assert member.birthday == "20000101"
+
+
+    def test_logs_member_field_changes(self, session: Session):
+        client = _make_client()
+
+        archive_artist(session, client, ARTIST_ID)
+
+        client.get_artist_detail.return_value.member_list[0].birthday = "20000101"
+
+        archive_artist(session, client, ARTIST_ID)
+
+        changes = session.exec(
+            select(ArchiveChangeLog).where(
+                ArchiveChangeLog.entity_type == "artist_member"
+            )
+        ).all()
+
+        assert any(
+            c.field_name == "birthday"
+            and c.old_value == "19990101"
+            and c.new_value == "20000101"
+            for c in changes
+        )
+
+
+    def test_updates_album_metadata(self, session: Session):
+        client = _make_client()
+
+        archive_artist(session, client, ARTIST_ID)
+
+        client.get_artist_albums.return_value.albums[0].album_name = "Changed Album"
+
+        archive_artist(session, client, ARTIST_ID)
+
+        album = session.get(Album, "ALBUM1")
+
+        assert album.name == "Changed Album"
+
+
+    def test_logs_album_changes(self, session: Session):
+        client = _make_client()
+
+        archive_artist(session, client, ARTIST_ID)
+
+        client.get_artist_albums.return_value.albums[0].song_cnt = 5
+
+        archive_artist(session, client, ARTIST_ID)
+
+        changes = session.exec(
+            select(ArchiveChangeLog).where(
+                ArchiveChangeLog.entity_type == "album",
+                ArchiveChangeLog.entity_id == "ALBUM1",
+            )
+        ).all()
+
+        assert any(
+            c.field_name == "song_count"
+            for c in changes
+        )
+
+
+    def test_does_not_duplicate_album_artist_relation(self, session: Session):
+        client = _make_client()
+
+        archive_artist(session, client, ARTIST_ID)
+        archive_artist(session, client, ARTIST_ID)
+
+        album = session.get(Album, "ALBUM1")
+
+        assert len(album.artists) == 1
+
+
+    def test_updates_song_metadata(self, session: Session):
+        client = _make_client()
+
+        archive_artist(session, client, ARTIST_ID)
+
+        client.get_artist_songs.return_value.songs[0].title = "Changed Song"
+
+        archive_artist(session, client, ARTIST_ID)
+
+        song = session.get(Song, "SONG1")
+
+        assert song.title == "Changed Song"
+
+
+    def test_logs_song_changes(self, session: Session):
+        client = _make_client()
+
+        archive_artist(session, client, ARTIST_ID)
+
+        client.get_artist_songs.return_value.songs[0].play_time = 300
+
+        archive_artist(session, client, ARTIST_ID)
+
+        changes = session.exec(
+            select(ArchiveChangeLog).where(
+                ArchiveChangeLog.entity_type == "song",
+                ArchiveChangeLog.entity_id == "SONG1",
+            )
+        ).all()
+
+        assert any(
+            c.field_name == "play_time"
+            for c in changes
+        )
+
+
+    def test_updates_song_artist_credit_name(self, session: Session):
+        client = _make_client()
+
+        archive_artist(session, client, ARTIST_ID)
+
+        client.get_artist_songs.return_value.songs[0].artists[1].name = (
+            "Changed Collab"
+        )
+
+        archive_artist(session, client, ARTIST_ID)
+
+        credit = session.exec(
+            select(SongArtist).where(
+                SongArtist.artist_id == COLLAB_ID
+            )
+        ).first()
+
+        assert credit.credited_name == "Changed Collab"
+
+
+    def test_does_not_overwrite_full_artist_with_credit_name(self, session: Session):
+        client = _make_client()
+
+        archive_artist(session, client, ARTIST_ID)
+
+        client.get_artist_songs.return_value.songs[0].artists[0].name = (
+            "Different Display Name"
+        )
+
+        archive_artist(session, client, ARTIST_ID)
+
+        artist = session.get(Artist, ARTIST_ID)
+
+        assert artist.name == "Test Artist"
+
+
+    def test_handles_empty_member_list(self, session: Session):
+        client = _make_client()
+
+        client.get_artist_detail.return_value.member_list = []
+
+        archive_artist(session, client, ARTIST_ID)
+
+        members = session.exec(
+            select(ArtistMember)
+        ).all()
+
+        assert members == []
+
+
+    def test_handles_empty_album_list(self, session: Session):
+        client = _make_client()
+
+        client.get_artist_albums.return_value.albums = []
+
+        archive_artist(session, client, ARTIST_ID)
+
+        albums = session.exec(
+            select(Album)
+        ).all()
+
+        assert albums == []
+
+
+    def test_handles_empty_song_list(self, session: Session):
+        client = _make_client()
+
+        client.get_artist_songs.return_value.songs = []
+
+        archive_artist(session, client, ARTIST_ID)
+
+        songs = session.exec(
+            select(Song)
+        ).all()
+
+        assert songs == []
+
+
+    def test_archive_rolls_back_when_fetch_fails(self, session: Session):
+        client = _make_client()
+
+        client.get_artist_songs.side_effect = Exception(
+            "melon api failed"
+        )
+
+        with pytest.raises(Exception):
+            archive_artist(session, client, ARTIST_ID)
+
+        artists = session.exec(
+            select(Artist)
+        ).all()
+
+        assert artists == []
+
+
+    def test_creates_independent_artists(self, session: Session):
+        client = _make_client()
+
+        archive_artist(session, client, ARTIST_ID)
+
+        other = _make_client()
+        other.get_artist_detail.return_value.artist_id = "2222222"
+        other.get_artist_detail.return_value.artist_name = "Other Artist"
+
+        archive_artist(session, other, "2222222")
+
+        artists = session.exec(
+            select(Artist)
+        ).all()
+
+        ids = {artist.artist_id for artist in artists}
+
+        assert ARTIST_ID in ids
+        assert "2222222" in ids
+
+
+    def test_change_log_contains_correct_entity_types(self, session: Session):
+        client = _make_client()
+
+        archive_artist(session, client, ARTIST_ID)
+
+        client.get_artist_detail.return_value.company_name = "Changed"
+
+        archive_artist(session, client, ARTIST_ID)
+
+        logs = session.exec(
+            select(ArchiveChangeLog)
+        ).all()
+
+        assert {
+            log.entity_type
+            for log in logs
+        } == {"artist"}

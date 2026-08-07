@@ -19,13 +19,11 @@ from src.db.tables import (
     AlbumArtist,
     Artist,
     ArtistMember,
-    ArtistSnapshot,
     Song,
     SongArtist,
 )
 
 import logging
-from datetime import datetime
 
 from src.utils.log import update_with_change_log
 
@@ -45,34 +43,9 @@ def archive_artist(session: Session, client: MelonClient, artist_id: str) -> Art
 
     detail = client.get_artist_detail(artist_id)
     artist = _upsert_artist(session, detail)
-    logger.info(f"[archive] artist {'created' if artist.first_seen_at == artist.last_updated_at else 'updated'}")
 
     for member in detail.member_list:
         _upsert_member(session, artist_id, member)
-
-    chart = client.get_artist_chart()
-    entry = next((e for e in chart.artists if e.artist_id == artist_id), None)
-    if entry is not None:
-        session.add(
-            ArtistSnapshot(
-                artist_id=artist_id,
-                current_rank=entry.current_rank,
-                past_rank=entry.past_rank,
-                rank_gap=entry.rank_gap,
-                top_rank=entry.top_rank,
-                past_week_rank=entry.past_week_rank,
-                total_fan_count=entry.total_fan_count,
-                increment_fan_count=entry.increment_fan_count,
-                increment_type=entry.increment_type,
-                song_index=entry.song_index,
-                mv_index=entry.mv_index,
-                photo_index=entry.photo_index,
-                fan_index=entry.fan_index,
-                like_index=entry.like_index,
-                toc_index=entry.toc_index,
-            )
-        )
-        logger.info(f"[archive] snapshot rank={entry.current_rank}")
 
     albums = client.get_artist_albums(artist_id)
     for album in albums.albums:
@@ -82,7 +55,12 @@ def archive_artist(session: Session, client: MelonClient, artist_id: str) -> Art
     for song in songs.songs:
         _upsert_song(session, song)
 
-    session.commit()
+    try:
+        session.commit()
+    except Exception as e:
+        logger.error(f"[archive] commit failed for artist={artist_id}: {e}")
+        session.rollback()
+        raise
     session.refresh(artist)
     logger.info(f"[archive] done artist={artist_id}")
     return artist
@@ -115,7 +93,8 @@ def _upsert_artist(session: Session, detail: ArtistDetail) -> Artist:
         },
     )
 
-    artist.last_updated_at = datetime.now(timezone.utc)
+    if changes or is_new:
+        artist.last_updated_at = datetime.now(timezone.utc)
 
     if is_new:
         logger.info(
@@ -139,10 +118,9 @@ def _upsert_member(session: Session, artist_id: str, member: ArtistMemberDBModel
             ArtistMember.member_artist_id == member.artist_id,
         )
     ).first()
-    if existing is not None:
-        return
-    session.add(
-        ArtistMember(
+    is_new = existing is None
+    if is_new:
+        existing = ArtistMember(
             artist_id=artist_id,
             member_artist_id=member.artist_id,
             member_name=member.artist_name,
@@ -150,57 +128,155 @@ def _upsert_member(session: Session, artist_id: str, member: ArtistMemberDBModel
             debut_day=member.debut_day,
             birthday=member.birthday,
         )
+        session.add(existing)
+        session.flush()
+    changes = update_with_change_log(
+        session,
+        entity_type="artist_member",
+        entity_id=str(existing.id),
+        obj=existing,
+        skip_log=is_new,
+        updates={
+            "member_name": member.artist_name,
+            "act_type_name": member.act_type_name,
+            "debut_day": member.debut_day,
+            "birthday": member.birthday,
+        },
     )
-    logger.info(f"[archive] member + {member.artist_id}")
+
+    if is_new:
+        logger.info(
+            "[archive] member created id=%s",
+            member.artist_id,
+        )
+    elif changes:
+        logger.info(
+            "[archive] member updated id=%s changes=%s",
+            member.artist_id,
+            changes,
+        )
 
 
 def _upsert_album(session: Session, artist_id: str, album: ArtistAlbum) -> None:
     existing = session.get(Album, album.album_id)
-    if existing is None:
-        session.add(
-            Album(
-                album_id=album.album_id,
-                name=album.album_name,
-                issue_date=album.issue_date,
-                song_count=album.song_cnt,
-                content_type=album.content_type,
-            )
+    is_new = existing is None
+    if is_new:
+        existing = Album(
+            album_id=album.album_id,
+            name=album.album_name,
+            issue_date=album.issue_date,
+            song_count=album.song_cnt,
+            content_type=album.content_type,
         )
+        session.add(existing)
+    changes = update_with_change_log(
+        session,
+        entity_type="album",
+        entity_id=album.album_id,
+        obj=existing,
+        skip_log=is_new,
+        updates={
+            "name": album.album_name,
+            "issue_date": album.issue_date,
+            "song_count": album.song_cnt,
+            "content_type": album.content_type,
+        },
+    )
+
+    if is_new:
+        logger.info(
+            "[archive] album created id=%s",
+            album.album_id,
+        )
+    elif changes:
+        logger.info(
+            "[archive] album updated id=%s changes=%s",
+            album.album_id,
+            changes,
+        )
+
+
+    link = session.exec(
+        select(AlbumArtist).where(
+            AlbumArtist.album_id == album.album_id,
+            AlbumArtist.artist_id == artist_id,
+        )
+    ).first()
+    if link is None:
         session.add(
             AlbumArtist(
                 album_id=album.album_id,
                 artist_id=artist_id,
             )
         )
-        logger.info(f"[archive] album + {album.album_id}")
 
 
 def _upsert_song(session: Session, song: ArtistSong) -> None:
     existing = session.get(Song, song.song_id)
-    if existing is None:
-        session.add(
-            Song(
-                song_id=song.song_id,
-                title=song.title,
-                album_id=song.album_id,
-                play_time=song.play_time,
-                issue_date=song.issue_date,
-                is_title_song=getattr(song, "is_title_song", None),
-            )
+    is_new = existing is None
+    if is_new:
+        existing = Song(
+            song_id=song.song_id,
+            title=song.title,
+            album_id=song.album_id,
+            play_time=song.play_time,
+            issue_date=song.issue_date,
+            is_title_song=getattr(song, "is_title_song", None),
         )
-        logger.info(f"[archive] song + {song.song_id}")
+        session.add(existing)
+    changes = update_with_change_log(
+        session,
+        entity_type="song",
+        entity_id=song.song_id,
+        obj=existing,
+        skip_log=is_new,
+        updates={
+            "title": song.title,
+            "album_id": song.album_id,
+            "play_time": song.play_time,
+            "issue_date": song.issue_date,
+            "is_title_song": getattr(song, "is_title_song", None),
+        },
+    )
 
     for credited in song.artists:
         _upsert_song_artist(session, song.song_id, credited)
+
+    if is_new:
+        logger.info(
+            "[archive] song created id=%s",
+            song.song_id,
+        )
+    elif changes:
+        logger.info(
+            "[archive] song updated id=%s changes=%s",
+            song.song_id,
+            changes,
+        )
 
 
 def _upsert_song_artist(session: Session, song_id: str, credited: ArtistDBModel) -> None:
     # Ensure a minimal Artist stub exists so the FK resolves, without
     # clobbering a fuller row already fetched via get_artist_detail.
     stub = session.get(Artist, credited.artist_id)
-    if stub is None:
-        session.add(Artist(artist_id=credited.artist_id, name=credited.name))
-        logger.info(f"[archive] artist stub + {credited.artist_id}")
+    is_new = stub is None
+    if is_new:
+        stub = Artist(artist_id=credited.artist_id, name=credited.name)
+        session.add(stub)
+        session.flush()
+    changes = update_with_change_log(
+        session,
+        entity_type="artist",
+        entity_id=credited.artist_id,
+        obj=stub,
+        updates={
+            "name": credited.name,
+        },
+    )
+    if is_new:
+        logger.info(f"[archive] artist stub created id={credited.artist_id}")
+    elif changes:
+        logger.info(f"[archive] artist stub updated id={credited.artist_id} changes={changes}")
 
     link = session.exec(
         select(SongArtist).where(
@@ -209,11 +285,23 @@ def _upsert_song_artist(session: Session, song_id: str, credited: ArtistDBModel)
         )
     ).first()
     if link is None:
-        session.add(
-            SongArtist(
-                song_id=song_id,
-                artist_id=credited.artist_id,
-                credited_name=credited.name,
-            )
+        link = SongArtist(
+            song_id=song_id,
+            artist_id=credited.artist_id,
+            credited_name=credited.name,
         )
-        logger.info(f"[archive] credit + {song_id}/{credited.artist_id}")
+        session.add(link)
+        session.flush()
+        logger.info(f"[archive] credit created {song_id}/{credited.artist_id}")
+    else:
+        changes = update_with_change_log(
+            session,
+            entity_type="song_artist",
+            entity_id=str(link.id),
+            obj=link,
+            updates={
+                "credited_name": credited.name,
+            },
+        )
+        if changes:
+            logger.info(f"[archive] credit updated {song_id}/{credited.artist_id} changes={changes}")

@@ -1,7 +1,7 @@
 PROJECT_NAME ?= scene-chart-api
 COMPOSE := docker compose -f ./docker-compose.yml --project-directory . -p "$(PROJECT_NAME)"
 
-.PHONY: build stop run revision
+.PHONY: build stop run revision logs main
 
 build:
 	COMPOSE_BAKE=true $(COMPOSE) build
@@ -18,3 +18,6 @@ revision:
 
 logs:
 	$(COMPOSE) logs -f
+
+main:
+	$(COMPOSE) exec app uv run --no-sync main.py
