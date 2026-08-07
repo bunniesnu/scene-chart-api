@@ -319,7 +319,7 @@ class RankHistoryPoint(SQLModel, table=True):
         primary_key=True,
         sa_type=SAUUID
     )
-    report_snapshot_id: int = Field(foreign_key="chartreportsnapshot.id", index=True)
+    report_snapshot_id: uuid.UUID = Field(foreign_key="chartreportsnapshot.id", index=True)
     is_predicted: bool = False       # False -> DATA, True -> PREDICTEDDATA
     x_index: int                      # XINDEX
     value: int                        # VALUE
