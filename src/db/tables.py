@@ -103,8 +103,8 @@ class ArtistSnapshot(SQLModel, table=True):
     )
 
     id: int | None = Field(default=None, primary_key=True)
-    artist_id: str = Field(foreign_key="artist.artist_id", index=True)
-    fetched_at: datetime = Field(default_factory=now, index=True)
+    artist_id: str = Field(foreign_key="artist.artist_id")
+    fetched_at: datetime = Field(default_factory=now)
 
     current_rank: int                # CURRANK
     past_rank: int                   # PASTRANK
@@ -227,7 +227,7 @@ class SongChartSnapshot(SQLModel, table=True):
     )
 
     id: int | None = Field(default=None, primary_key=True)
-    song_id: str = Field(foreign_key="song.song_id", index=True)
+    song_id: str = Field(foreign_key="song.song_id")
     chart_type: ChartType = Field(
         sa_column=Column(
             SAEnum(
@@ -236,10 +236,9 @@ class SongChartSnapshot(SQLModel, table=True):
                 name="charttype",
             ),
             nullable=False,
-            index=True,
         )
     )
-    fetched_at: datetime = Field(default_factory=now, index=True)
+    fetched_at: datetime = Field(default_factory=now)
 
     rank_day: str | None = None      # RANKDAY (chart's own snapshot date)
     rank_hour: str | None = None     # RANKHOUR
@@ -269,8 +268,8 @@ class ChartReportSnapshot(SQLModel, table=True):
     )
 
     id: int | None = Field(default=None, primary_key=True)
-    song_id: str = Field(foreign_key="song.song_id", index=True)
-    fetched_at: datetime = Field(default_factory=now, index=True)
+    song_id: str = Field(foreign_key="song.song_id")
+    fetched_at: datetime = Field(default_factory=now)
     recent_time: str | None = None       # RECENTTIME
 
     current_rank: int                    # SONGINFO.CURRANK
@@ -321,7 +320,7 @@ class GraphPoint(SQLModel, table=True):
     )
 
     id: int | None = Field(default=None, primary_key=True)
-    song_id: str = Field(foreign_key="song.song_id", index=True)
+    song_id: str = Field(foreign_key="song.song_id")
     resolution: GraphResolution = Field(
         sa_column=Column(
             SAEnum(
@@ -330,10 +329,9 @@ class GraphPoint(SQLModel, table=True):
                 name="graphresolution",
             ),
             nullable=False,
-            index=True,
         )
     )
-    fetch_batch_at: datetime = Field(default_factory=now, index=True)
+    fetch_batch_at: datetime = Field(default_factory=now)
 
     x: int                     # X
     value: float                # VAL
@@ -370,8 +368,8 @@ class VideoViewSnapshot(SQLModel, table=True):
     )
 
     id: int | None = Field(default=None, primary_key=True)
-    mv_id: str = Field(foreign_key="video.mv_id", index=True)
-    fetched_at: datetime = Field(default_factory=now, index=True)
+    mv_id: str = Field(foreign_key="video.mv_id")
+    fetched_at: datetime = Field(default_factory=now)
     view_count: int              # VIEWCNT
 
     video: Video = Relationship(back_populates="view_snapshots")
