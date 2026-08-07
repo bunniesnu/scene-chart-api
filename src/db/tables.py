@@ -63,6 +63,7 @@ class Artist(SQLModel, table=True):
     members: list["ArtistMember"] = Relationship(back_populates="artist")
     chart_snapshots: list["ArtistSnapshot"] = Relationship(back_populates="artist")
     credited_songs: list["SongArtist"] = Relationship(back_populates="artist")
+    albums: list["AlbumArtist"] = Relationship(back_populates="artist")
 
 
 class ArtistMember(SQLModel, table=True):
@@ -120,18 +121,31 @@ class ArtistSnapshot(SQLModel, table=True):
 # Dimension: Album / Song
 # ---------------------------------------------------------------------------
 
+class AlbumArtist(SQLModel, table=True):
+    __table_args__ = (
+        UniqueConstraint("album_id", "artist_id"),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    album_id: str = Field(foreign_key="album.album_id", index=True)
+    artist_id: str = Field(foreign_key="artist.artist_id", index=True)
+
+    album: "Album" = Relationship(back_populates="artists")
+    artist: "Artist" = Relationship(back_populates="albums")
+
+
 class Album(SQLModel, table=True):
     """Static album metadata. Source: ArtistClient.get_artist_albums -> ArtistAlbums
     (or AlbumClient.get_album_info for the full detail). Upsert on album_id."""
 
     album_id: str = Field(primary_key=True)               # ALBUMID
-    artist_id: str = Field(foreign_key="artist.artist_id", index=True)
     name: str                                              # ALBUMNAME
     issue_date: str | None = None                          # ISSUEDATE
     song_count: int | None = None                          # SONGCNT
     content_type: str | None = None                        # CTYPE
     first_seen_at: datetime = Field(default_factory=now)
 
+    artists: list["AlbumArtist"] = Relationship(back_populates="album")
     songs: list["Song"] = Relationship(back_populates="album")
 
 
