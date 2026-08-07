@@ -430,3 +430,19 @@ class Magazine(SQLModel, table=True):
     artist_id: str = Field(foreign_key="artist.artist_id", index=True)
     content_name: str | None = None              # CONTSNAME
     first_seen_at: datetime = Field(default_factory=now)
+
+
+class ArchiveChangeLog(SQLModel, table=True):
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+    )
+
+    entity_type: str        # "artist", "album", "song"
+    entity_id: str          # ARTISTID, ALBUMID, SONGID
+
+    field_name: str         # "company_name"
+    old_value: str | None
+    new_value: str | None
+
+    changed_at: datetime = Field(default_factory=now)
