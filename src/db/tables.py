@@ -1,0 +1,320 @@
+"""SQLModel schema for logging melon-api data for a specific artist over time.
+
+Design notes
+------------
+- "Dimension" tables (Artist, Album, Song, Video, Photo, Magazine) hold the
+  latest known metadata for an entity and are upserted on each fetch, keyed
+  by Melon's own id (ARTISTID / ALBUMID / SONGID / ...).
+- "Snapshot" tables are append-only time series: every fetch inserts a new
+  row stamped with `fetched_at`, so you can track how a value changed over
+  time (fan count, chart rank, listener count, view count, ...).
+- All Melon ids are stored as `str`, matching melon-api's own models (Melon
+  serializes ARTISTID/SONGID/etc. as strings, not ints).
+- Field comments reference the melon-api pydantic model + Melon's original
+  ALLCAPS JSON key so you can trace each column back to the source payload.
+"""
+
+from datetime import datetime
+from enum import Enum
+
+from sqlmodel import SQLModel, Field, Relationship, UniqueConstraint
+from sqlalchemy.sql.functions import now
+
+
+# ---------------------------------------------------------------------------
+# Enums
+# ---------------------------------------------------------------------------
+
+class ChartType(str, Enum):
+    """Which chart endpoint a SongChartSnapshot row came from."""
+    REALTIME = "realtime"    # ChartClient.get_realtime_chart -> RealtimeChart
+    TOP100 = "top100"        # ChartClient.get_top100_chart   -> Top100Chart
+    DAILY = "daily"          # ChartClient.get_daily_chart    -> DailyChart
+    WEEKLY = "weekly"        # ChartClient.get_weekly_chart   -> WeeklyChart
+    HOT100 = "hot100"        # ChartClient.get_hot100_chart   -> Hot100Chart
+
+
+class GraphResolution(str, Enum):
+    """Which Hot100 graph endpoint a GraphPoint row came from."""
+    HOURLY = "hourly"        # ChartClient.get_hot100_graph_hour -> ChartGraph
+    FIVE_MIN = "five_min"    # ChartClient.get_hot100_graph_five -> FiveGraph
+
+
+# ---------------------------------------------------------------------------
+# Dimension: Artist
+# ---------------------------------------------------------------------------
+
+class Artist(SQLModel, table=True):
+    """Static artist profile. Source: ArtistClient.get_artist_detail -> ArtistDetail.
+    Upsert (insert-or-update) on artist_id each time you re-fetch."""
+
+    artist_id: str = Field(primary_key=True)             # ARTISTID
+    name: str                                             # ARTISTNAME
+    debut_date: str | None = None                         # DEBUTDATE
+    nationality: str | None = None                        # NATIONALITY
+    gender: str | None = None                             # GENDER
+    act_type: str | None = None                           # ACTTYPE
+    act_genre: str | None = None                          # ACTGENRE
+    company_name: str | None = None                       # COMPNAME
+    intro: str | None = None                              # INTRO
+    first_seen_at: datetime = Field(default_factory=now)
+    last_updated_at: datetime = Field(default_factory=now)
+
+    members: list["ArtistMember"] = Relationship(back_populates="artist")
+    chart_snapshots: list["ArtistSnapshot"] = Relationship(back_populates="artist")
+    credited_songs: list["SongArtist"] = Relationship(back_populates="artist")
+
+
+class ArtistMember(SQLModel, table=True):
+    """Group member entry. Source: ArtistDetail.member_list (MEMBERLIST).
+    Upsert on (artist_id, member_artist_id)."""
+
+    __table_args__ = (UniqueConstraint("artist_id", "member_artist_id"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    artist_id: str = Field(foreign_key="artist.artist_id", index=True)
+    member_artist_id: str                                 # ARTISTID
+    member_name: str                                      # ARTISTNAME
+    act_type_name: str | None = None                      # ACTTYPENAME
+    debut_day: str | None = None                          # DEBUTDAY
+    birthday: str | None = None                           # BIRTHDAY
+
+    artist: Artist = Relationship(back_populates="members")
+
+
+# ---------------------------------------------------------------------------
+# Time series: artist chart entry (fan counts + composite indices)
+# ---------------------------------------------------------------------------
+
+class ArtistSnapshot(SQLModel, table=True):
+    """One point-in-time reading of the artist's chart entry: rank, fan count,
+    and Melon's composite popularity indices.
+    Source: ChartClient.get_artist_chart -> ArtistChart.artists[i] (ArtistChartEntry).
+    Insert a new row every time you poll — this table is append-only."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    artist_id: str = Field(foreign_key="artist.artist_id", index=True)
+    fetched_at: datetime = Field(default_factory=now, index=True)
+
+    current_rank: int                # CURRANK
+    past_rank: int                   # PASTRANK
+    rank_gap: int                    # RANKGAP
+    top_rank: int                    # TOPRANK
+    past_week_rank: int              # PASTWEEKRANK
+
+    total_fan_count: int             # TOTFANCNT
+    increment_fan_count: int         # INCREMFANCNT
+    increment_type: str              # INCREMTYPE
+
+    song_index: float                # SONGIDX
+    mv_index: float                  # MVIDX
+    photo_index: float               # PHOTOIDX
+    fan_index: float                 # FANIDX
+    like_index: float                # LIKEIDX
+    toc_index: float                 # TOCIDX
+
+    artist: Artist = Relationship(back_populates="chart_snapshots")
+
+
+# ---------------------------------------------------------------------------
+# Dimension: Album / Song
+# ---------------------------------------------------------------------------
+
+class Album(SQLModel, table=True):
+    """Static album metadata. Source: ArtistClient.get_artist_albums -> ArtistAlbums
+    (or AlbumClient.get_album_info for the full detail). Upsert on album_id."""
+
+    album_id: str = Field(primary_key=True)               # ALBUMID
+    artist_id: str = Field(foreign_key="artist.artist_id", index=True)
+    name: str                                              # ALBUMNAME
+    issue_date: str | None = None                          # ISSUEDATE
+    song_count: int | None = None                          # SONGCNT
+    content_type: str | None = None                        # CTYPE
+    first_seen_at: datetime = Field(default_factory=now)
+
+    songs: list["Song"] = Relationship(back_populates="album")
+
+
+class Song(SQLModel, table=True):
+    """Static song metadata, shared shape across chart/artist song lists.
+    Source: BaseSong subclasses (ChartSong, ArtistSong, AlbumSong, ...).
+    Upsert on song_id.
+
+    Every credited artist (ARTISTLIST) — the artist you're tracking plus any
+    collaborators/features — is logged in SongArtist below, not as a single
+    FK column here, since a song can carry more than one credit."""
+
+    song_id: str = Field(primary_key=True)                 # SONGID
+    title: str                                             # SONGNAME
+    album_id: str | None = Field(default=None, foreign_key="album.album_id", index=True)
+    play_time: int | None = None                           # PLAYTIME
+    issue_date: str | None = None                          # ISSUEDATE
+    is_title_song: bool | None = None                      # ISTITLESONG
+    first_seen_at: datetime = Field(default_factory=now)
+
+    album: Album | None = Relationship(back_populates="songs")
+    credited_artists: list["SongArtist"] = Relationship(back_populates="song")
+    chart_snapshots: list["SongChartSnapshot"] = Relationship(back_populates="song")
+    report_snapshots: list["ChartReportSnapshot"] = Relationship(back_populates="song")
+
+
+class SongArtist(SQLModel, table=True):
+    """Link table: every artist credited on a song (BaseSong.ARTISTLIST),
+    including collaborators/features beyond whichever artist you're tracking.
+    One row per (song_id, artist_id).
+
+    `credited_name` stores the ARTISTNAME as it appeared on *this* song's
+    credit list — Melon occasionally varies a group's display name across
+    releases, so it's kept alongside the FK rather than always trusting
+    Artist.name.
+
+    Note: a collaborator may not have a full ArtistDetail fetched yet. Upsert
+    a minimal Artist stub (artist_id + name only, other fields left null) for
+    every id seen here so the FK always resolves, then backfill the rest of
+    Artist's columns later if/when you call get_artist_detail for them."""
+
+    __table_args__ = (UniqueConstraint("song_id", "artist_id"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    song_id: str = Field(foreign_key="song.song_id", index=True)
+    artist_id: str = Field(foreign_key="artist.artist_id", index=True)  # ARTISTID
+    credited_name: str                                                  # ARTISTNAME
+
+    song: Song = Relationship(back_populates="credited_artists")
+    artist: Artist = Relationship(back_populates="credited_songs")
+
+
+# ---------------------------------------------------------------------------
+# Time series: chart rank snapshots (realtime / top100 / daily / weekly / hot100)
+# ---------------------------------------------------------------------------
+
+class SongChartSnapshot(SQLModel, table=True):
+    """One point-in-time chart-rank reading for a song, from ChartSong.
+    Covers RealtimeChart, Top100Chart, DailyChart, WeeklyChart, and Hot100Chart
+    — they all share the ChartSong shape, distinguished here by `chart_type`.
+    One row per (song, chart_type, fetch)."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    song_id: str = Field(foreign_key="song.song_id", index=True)
+    chart_type: ChartType = Field(index=True)
+    fetched_at: datetime = Field(default_factory=now, index=True)
+
+    rank_day: str | None = None      # RANKDAY (chart's own snapshot date)
+    rank_hour: str | None = None     # RANKHOUR
+
+    current_rank: int                # CURRANK
+    past_rank: int                   # PASTRANK
+    rank_gap: int                    # RANKGAP
+    rank_type: str                   # RANKTYPE ("UP" / "DOWN" / ...)
+
+    song: Song = Relationship(back_populates="chart_snapshots")
+
+
+# ---------------------------------------------------------------------------
+# Time series: chart report (listener stats + rank), from ChartReport
+# ---------------------------------------------------------------------------
+
+class ChartReportSnapshot(SQLModel, table=True):
+    """One point-in-time chart-report reading for a song.
+    Source: ChartClient.get_chart_report -> ChartReport."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    song_id: str = Field(foreign_key="song.song_id", index=True)
+    fetched_at: datetime = Field(default_factory=now, index=True)
+    recent_time: str | None = None       # RECENTTIME
+
+    current_rank: int                    # SONGINFO.CURRANK
+    past_rank: int                       # SONGINFO.PASTRANK
+    rank_gap: int                        # SONGINFO.RANKGAP
+    rank_type: str                       # SONGINFO.RANKTYPE
+
+    listener_one_hour: str | None = None  # LISTENERDATA.ONEHOUR ('-' if unavailable)
+    listener_one_day: str | None = None   # LISTENERDATA.ONEDAY
+
+    song: Song = Relationship(back_populates="report_snapshots")
+    rank_history_points: list["RankHistoryPoint"] = Relationship(back_populates="report_snapshot")
+
+
+class RankHistoryPoint(SQLModel, table=True):
+    """One point on the rank-trend/prediction graph embedded in a chart report.
+    `is_predicted` splits RankChart.DATA (actual, False) from
+    RankChart.PREDICTEDDATA (forecast, True) — PREDICTEDDATA may be absent."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    report_snapshot_id: int = Field(foreign_key="chartreportsnapshot.id", index=True)
+    is_predicted: bool = False       # False -> DATA, True -> PREDICTEDDATA
+    x_index: int                      # XINDEX
+    value: int                        # VALUE
+    label: str                        # LABEL
+
+    report_snapshot: ChartReportSnapshot = Relationship(back_populates="rank_history_points")
+
+
+# ---------------------------------------------------------------------------
+# Time series: Hot100 graph series (hourly and five-minute resolution)
+# ---------------------------------------------------------------------------
+
+class GraphPoint(SQLModel, table=True):
+    """One point of a Hot100 score/rank series.
+    Source: ChartClient.get_hot100_graph_hour -> ChartGraph (hourly, includes
+    ENTGRAPHDATA rank) and ChartClient.get_hot100_graph_five -> FiveGraph
+    (five-minute, score only). Each fetch returns a full series per song;
+    `fetch_batch_at` groups the points that came from the same request."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    song_id: str = Field(foreign_key="song.song_id", index=True)
+    resolution: GraphResolution = Field(index=True)
+    fetch_batch_at: datetime = Field(default_factory=now, index=True)
+
+    x: int                     # X
+    value: float                # VAL
+    rank: int | None = None      # RANK (hourly only, from ENTGRAPHDATA)
+
+
+# ---------------------------------------------------------------------------
+# Dimension + time series: artist content lists (videos, photos, magazines)
+# ---------------------------------------------------------------------------
+
+class Video(SQLModel, table=True):
+    """Artist video-list entry. Source: ArtistClient.get_artist_videos -> ArtistVideos.
+    Upsert on mv_id; log view_count growth via VideoViewSnapshot."""
+
+    mv_id: str = Field(primary_key=True)         # MVID
+    artist_id: str = Field(foreign_key="artist.artist_id", index=True)
+    name: str                                     # MVNAME
+    song_id: str | None = None                    # SONGID
+    issue_date: str | None = None                 # ISSUEDATE
+    first_seen_at: datetime = Field(default_factory=now)
+
+    view_snapshots: list["VideoViewSnapshot"] = Relationship(back_populates="video")
+
+
+class VideoViewSnapshot(SQLModel, table=True):
+    """Time series of a video's view_count (VIEWCNT), which changes on every fetch."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    mv_id: str = Field(foreign_key="video.mv_id", index=True)
+    fetched_at: datetime = Field(default_factory=now, index=True)
+    view_count: int              # VIEWCNT
+
+    video: Video = Relationship(back_populates="view_snapshots")
+
+
+class Photo(SQLModel, table=True):
+    """Artist photo-list entry. Source: ArtistClient.get_artist_photos -> ArtistPhotos.
+    Upsert on photo_id."""
+
+    photo_id: str = Field(primary_key=True)      # PHOTOID
+    artist_id: str = Field(foreign_key="artist.artist_id", index=True)
+    photo_name: str | None = None                # PHOTONAME
+    first_seen_at: datetime = Field(default_factory=now)
+
+
+class Magazine(SQLModel, table=True):
+    """Artist magazine-list entry. Source: ArtistClient.get_artist_magazines -> ArtistMagazines.
+    Upsert on content_id."""
+
+    content_id: str = Field(primary_key=True)    # CONTSID
+    artist_id: str = Field(foreign_key="artist.artist_id", index=True)
+    content_name: str | None = None              # CONTSNAME
+    first_seen_at: datetime = Field(default_factory=now)
