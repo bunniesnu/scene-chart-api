@@ -12,7 +12,7 @@ import pytest
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from archive.artist import archive_artist
-from src.db.tables import Album, Artist, ArtistMember, ArtistSnapshot, Song, SongArtist
+from src.db.tables import Album, ArchiveChangeLog, Artist, ArtistMember, ArtistSnapshot, Song, SongArtist
 
 ARTIST_ID = "1234567"
 OTHER_CHARTING_ARTIST_ID = "9999999"
@@ -187,3 +187,40 @@ class TestArchiveArtist:
             select(ArtistSnapshot).where(ArtistSnapshot.artist_id == ARTIST_ID)
         ).all()
         assert len(snapshots) == 2
+
+    def test_logs_artist_field_changes(self, session: Session):
+        client = _make_client()
+
+        # First archive creates the artist.
+        archive_artist(session, client, ARTIST_ID)
+
+        # Simulate Melon metadata change.
+        client.get_artist_detail.return_value.company_name = "Changed Ent."
+        client.get_artist_detail.return_value.intro = "Updated intro."
+
+        archive_artist(session, client, ARTIST_ID)
+
+        changes = session.exec(
+            select(ArchiveChangeLog).where(
+                ArchiveChangeLog.entity_type == "artist",
+                ArchiveChangeLog.entity_id == ARTIST_ID,
+            )
+        ).all()
+
+        assert len(changes) == 2
+
+        company_change = next(
+            c for c in changes
+            if c.field_name == "company_name"
+        )
+
+        assert company_change.old_value == "Test Ent."
+        assert company_change.new_value == "Changed Ent."
+
+        intro_change = next(
+            c for c in changes
+            if c.field_name == "intro"
+        )
+
+        assert intro_change.old_value == "A test artist."
+        assert intro_change.new_value == "Updated intro."

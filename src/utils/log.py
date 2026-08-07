@@ -1,6 +1,6 @@
 from sqlmodel import Session
 
-from db.tables import ArchiveChangeLog
+from src.db.tables import ArchiveChangeLog
 
 
 def log_change(
