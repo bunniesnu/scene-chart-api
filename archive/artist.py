@@ -27,7 +27,7 @@ from src.db.tables import (
 import logging
 from datetime import datetime
 
-from src.utils.log import log_change
+from src.utils.log import update_with_change_log
 
 logger = logging.getLogger(__name__)
 
@@ -90,44 +90,45 @@ def archive_artist(session: Session, client: MelonClient, artist_id: str) -> Art
 
 def _upsert_artist(session: Session, detail: ArtistDetail) -> Artist:
     artist = session.get(Artist, detail.artist_id)
-    if artist is None:
+
+    is_new = artist is None
+
+    if is_new:
         artist = Artist(artist_id=detail.artist_id, name=detail.artist_name)
         session.add(artist)
-        logger.info(f"[archive] artist + {detail.artist_id}")
 
-    updates = {
-        "name": detail.artist_name,
-        "debut_date": detail.debut_date,
-        "nationality": detail.nationality,
-        "gender": detail.gender,
-        "act_type": detail.act_type,
-        "act_genre": detail.act_genre,
-        "company_name": detail.company_name,
-        "intro": detail.intro,
-    }
-
-    for field, new_value in updates.items():
-        old_value = getattr(artist, field)
-
-        if old_value != new_value:
-
-            if artist.__dict__.get("_sa_instance_state") and old_value is not None:
-                log_change(
-                    session,
-                    entity_type="artist",
-                    entity_id=artist.artist_id,
-                    field_name=field,
-                    old=old_value,
-                    new=new_value,
-                )
-
-            setattr(
-                artist,
-                field,
-                new_value,
-            )
+    changes = update_with_change_log(
+        session,
+        entity_type="artist",
+        entity_id=artist.artist_id,
+        obj=artist,
+        skip_log=is_new,
+        updates={
+            "name": detail.artist_name,
+            "debut_date": detail.debut_date,
+            "nationality": detail.nationality,
+            "gender": detail.gender,
+            "act_type": detail.act_type,
+            "act_genre": detail.act_genre,
+            "company_name": detail.company_name,
+            "intro": detail.intro,
+        },
+    )
 
     artist.last_updated_at = datetime.now(timezone.utc)
+
+    if is_new:
+        logger.info(
+            "[archive] artist created id=%s",
+            artist.artist_id,
+        )
+    elif changes:
+        logger.info(
+            "[archive] artist updated id=%s changes=%s",
+            artist.artist_id,
+            changes,
+        )
+
     return artist
 
 
