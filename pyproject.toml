@@ -7,6 +7,7 @@ requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.19.0",
     "fastapi>=0.141.1",
+    "melon-api-client>=0.2.0",
     "psycopg2-binary>=2.9.12",
     "pydantic>=2.13.4",
     "sqlmodel>=0.0.39",
