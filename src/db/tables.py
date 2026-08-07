@@ -16,8 +16,9 @@ Design notes
 
 from datetime import datetime
 from enum import Enum
+import uuid
 
-from sqlalchemy import Column, Index, Enum as SAEnum
+from sqlalchemy import Column, Index, Enum as SAEnum, UUID as SAUUID
 from sqlmodel import SQLModel, Field, Relationship, UniqueConstraint
 from sqlalchemy.sql.functions import now
 
@@ -73,7 +74,11 @@ class ArtistMember(SQLModel, table=True):
 
     __table_args__ = (UniqueConstraint("artist_id", "member_artist_id"),)
 
-    id: int | None = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=SAUUID
+    )
     artist_id: str = Field(foreign_key="artist.artist_id", index=True)
     member_artist_id: str                                 # ARTISTID
     member_name: str                                      # ARTISTNAME
@@ -102,7 +107,11 @@ class ArtistSnapshot(SQLModel, table=True):
         ),
     )
 
-    id: int | None = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=SAUUID
+    )
     artist_id: str = Field(foreign_key="artist.artist_id")
     fetched_at: datetime = Field(default_factory=now)
 
@@ -135,7 +144,11 @@ class AlbumArtist(SQLModel, table=True):
         UniqueConstraint("album_id", "artist_id"),
     )
 
-    id: int | None = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=SAUUID
+    )
     album_id: str = Field(foreign_key="album.album_id", index=True)
     artist_id: str = Field(foreign_key="artist.artist_id", index=True)
 
@@ -198,7 +211,11 @@ class SongArtist(SQLModel, table=True):
 
     __table_args__ = (UniqueConstraint("song_id", "artist_id"),)
 
-    id: int | None = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=SAUUID
+    )
     song_id: str = Field(foreign_key="song.song_id", index=True)
     artist_id: str = Field(foreign_key="artist.artist_id", index=True)  # ARTISTID
     credited_name: str                                                  # ARTISTNAME
@@ -226,7 +243,11 @@ class SongChartSnapshot(SQLModel, table=True):
         ),
     )
 
-    id: int | None = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=SAUUID
+    )
     song_id: str = Field(foreign_key="song.song_id")
     chart_type: ChartType = Field(
         sa_column=Column(
@@ -267,7 +288,11 @@ class ChartReportSnapshot(SQLModel, table=True):
         ),
     )
 
-    id: int | None = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=SAUUID
+    )
     song_id: str = Field(foreign_key="song.song_id")
     fetched_at: datetime = Field(default_factory=now)
     recent_time: str | None = None       # RECENTTIME
@@ -289,7 +314,11 @@ class RankHistoryPoint(SQLModel, table=True):
     `is_predicted` splits RankChart.DATA (actual, False) from
     RankChart.PREDICTEDDATA (forecast, True) — PREDICTEDDATA may be absent."""
 
-    id: int | None = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=SAUUID
+    )
     report_snapshot_id: int = Field(foreign_key="chartreportsnapshot.id", index=True)
     is_predicted: bool = False       # False -> DATA, True -> PREDICTEDDATA
     x_index: int                      # XINDEX
@@ -319,7 +348,11 @@ class GraphPoint(SQLModel, table=True):
         ),
     )
 
-    id: int | None = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=SAUUID
+    )
     song_id: str = Field(foreign_key="song.song_id")
     resolution: GraphResolution = Field(
         sa_column=Column(
@@ -367,7 +400,11 @@ class VideoViewSnapshot(SQLModel, table=True):
         ),
     )
 
-    id: int | None = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=SAUUID
+    )
     mv_id: str = Field(foreign_key="video.mv_id")
     fetched_at: datetime = Field(default_factory=now)
     view_count: int              # VIEWCNT
