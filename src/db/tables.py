@@ -17,6 +17,7 @@ Design notes
 from datetime import datetime
 from enum import Enum
 
+from sqlalchemy import Column, Index, Enum as SAEnum
 from sqlmodel import SQLModel, Field, Relationship, UniqueConstraint
 from sqlalchemy.sql.functions import now
 
@@ -92,6 +93,14 @@ class ArtistSnapshot(SQLModel, table=True):
     and Melon's composite popularity indices.
     Source: ChartClient.get_artist_chart -> ArtistChart.artists[i] (ArtistChartEntry).
     Insert a new row every time you poll — this table is append-only."""
+
+    __table_args__ = (
+        Index(
+            "ix_artistsnapshot_artist_fetched",
+            "artist_id",
+            "fetched_at",
+        ),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
     artist_id: str = Field(foreign_key="artist.artist_id", index=True)
@@ -208,9 +217,28 @@ class SongChartSnapshot(SQLModel, table=True):
     — they all share the ChartSong shape, distinguished here by `chart_type`.
     One row per (song, chart_type, fetch)."""
 
+    __table_args__ = (
+        Index(
+            "ix_songchartsnapshot_song_chart_fetched",
+            "song_id",
+            "chart_type",
+            "fetched_at",
+        ),
+    )
+
     id: int | None = Field(default=None, primary_key=True)
     song_id: str = Field(foreign_key="song.song_id", index=True)
-    chart_type: ChartType = Field(index=True)
+    chart_type: ChartType = Field(
+        sa_column=Column(
+            SAEnum(
+                ChartType,
+                values_callable=lambda enum: [item.value for item in enum],
+                name="charttype",
+            ),
+            nullable=False,
+            index=True,
+        )
+    )
     fetched_at: datetime = Field(default_factory=now, index=True)
 
     rank_day: str | None = None      # RANKDAY (chart's own snapshot date)
@@ -231,6 +259,14 @@ class SongChartSnapshot(SQLModel, table=True):
 class ChartReportSnapshot(SQLModel, table=True):
     """One point-in-time chart-report reading for a song.
     Source: ChartClient.get_chart_report -> ChartReport."""
+
+    __table_args__ = (
+        Index(
+            "ix_chartreportsnapshot_song_fetched",
+            "song_id",
+            "fetched_at",
+        ),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
     song_id: str = Field(foreign_key="song.song_id", index=True)
@@ -275,9 +311,28 @@ class GraphPoint(SQLModel, table=True):
     (five-minute, score only). Each fetch returns a full series per song;
     `fetch_batch_at` groups the points that came from the same request."""
 
+    __table_args__ = (
+        Index(
+            "ix_graphpoint_song_resolution_batch",
+            "song_id",
+            "resolution",
+            "fetch_batch_at",
+        ),
+    )
+
     id: int | None = Field(default=None, primary_key=True)
     song_id: str = Field(foreign_key="song.song_id", index=True)
-    resolution: GraphResolution = Field(index=True)
+    resolution: GraphResolution = Field(
+        sa_column=Column(
+            SAEnum(
+                GraphResolution,
+                values_callable=lambda enum: [item.value for item in enum],
+                name="graphresolution",
+            ),
+            nullable=False,
+            index=True,
+        )
+    )
     fetch_batch_at: datetime = Field(default_factory=now, index=True)
 
     x: int                     # X
@@ -305,6 +360,14 @@ class Video(SQLModel, table=True):
 
 class VideoViewSnapshot(SQLModel, table=True):
     """Time series of a video's view_count (VIEWCNT), which changes on every fetch."""
+
+    __table_args__ = (
+        Index(
+            "ix_videoviewsnapshot_mv_fetched",
+            "mv_id",
+            "fetched_at",
+        ),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
     mv_id: str = Field(foreign_key="video.mv_id", index=True)
