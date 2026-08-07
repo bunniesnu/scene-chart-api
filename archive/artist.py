@@ -7,7 +7,7 @@ ArtistSnapshot row. Re-running it on a schedule (e.g. hourly, via cron/Celery)
 builds the time series.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from melon.models import ArtistAlbum, Artist as ArtistDBModel, ArtistDetail, ArtistSong
 from melon.models.artist import ArtistMember as ArtistMemberDBModel
@@ -101,7 +101,7 @@ def _upsert_artist(session: Session, detail: ArtistDetail) -> Artist:
     artist.act_genre = detail.act_genre
     artist.company_name = detail.company_name
     artist.intro = detail.intro
-    artist.last_updated_at = datetime.utcnow()
+    artist.last_updated_at = datetime.now(timezone.utc)
     return artist
 
 
