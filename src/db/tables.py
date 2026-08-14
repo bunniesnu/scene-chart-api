@@ -166,6 +166,7 @@ class Album(SQLModel, table=True):
     song_count: int | None = None                          # SONGCNT
     content_type: str | None = None                        # CTYPE
     first_seen_at: datetime = Field(default_factory=now)
+    last_updated_at: datetime = Field(default_factory=now)
 
     artists: list["AlbumArtist"] = Relationship(back_populates="album")
     songs: list["Song"] = Relationship(back_populates="album")
@@ -187,6 +188,7 @@ class Song(SQLModel, table=True):
     issue_date: str | None = None                          # ISSUEDATE
     is_title_song: bool | None = None                      # ISTITLESONG
     first_seen_at: datetime = Field(default_factory=now)
+    last_updated_at: datetime = Field(default_factory=now)
 
     album: Album | None = Relationship(back_populates="songs")
     credited_artists: list["SongArtist"] = Relationship(back_populates="song")

@@ -2,9 +2,11 @@
 SQLModel schema defined in melon_models.py.
 
 archive_artist() is one "fetch cycle": it upserts the artist's dimension rows
-(Artist, ArtistMember, Album, Song, SongArtist) and appends a new
-ArtistSnapshot row. Re-running it on a schedule (e.g. hourly, via cron/Celery)
-builds the time series.
+(Artist, ArtistMember, Album, AlbumArtist, Song, SongArtist).
+
+Changes to existing dimension rows are recorded in ArchiveChangeLog.
+Re-running it on a schedule (e.g. hourly, via cron/Celery) keeps the dimension
+tables up to date while preserving metadata change history.
 """
 
 from datetime import datetime, timezone
@@ -31,16 +33,17 @@ logger = logging.getLogger(__name__)
 
 
 def archive_artist(session: Session, client: MelonClient, artist_id: str) -> Artist:
-    """Fetch artist detail, chart standing, albums, and songs for `artist_id`
-    and log them via `session`.
+    """Fetch and archive all available artist metadata for `artist_id`.
 
-    Upserts Artist / ArtistMember / Album / Song / SongArtist. Appends one new
-    ArtistSnapshot row for this fetch (the artist chart is scanned for the
-    entry matching `artist_id`; if the artist isn't currently charting, no
-    snapshot row is added). Commits and returns the upserted Artist row.
+    Upserts Artist / ArtistMember / Album / AlbumArtist / Song / SongArtist.
+    Changes to existing dimension rows are recorded in ArchiveChangeLog.
+
+    Commits the entire fetch cycle atomically and returns the upserted Artist.
     """
-    logger.info(f"[archive] artist={artist_id}")
-
+    logger.info(
+        "[archive] artist created id=%s",
+        artist_id,
+    )
     detail = client.get_artist_detail(artist_id)
     artist = _upsert_artist(session, detail)
 
@@ -57,12 +60,18 @@ def archive_artist(session: Session, client: MelonClient, artist_id: str) -> Art
 
     try:
         session.commit()
-    except Exception as e:
-        logger.error(f"[archive] commit failed for artist={artist_id}: {e}")
+    except Exception:
+        logger.exception(
+            "[archive] commit failed for artist=%s",
+            artist_id,
+        )
         session.rollback()
         raise
     session.refresh(artist)
-    logger.info(f"[archive] done artist={artist_id}")
+    logger.info(
+        "[archive] done artist=%s",
+        artist_id,
+    )
     return artist
 
 
@@ -129,7 +138,6 @@ def _upsert_member(session: Session, artist_id: str, member: ArtistMemberDBModel
             birthday=member.birthday,
         )
         session.add(existing)
-        session.flush()
     changes = update_with_change_log(
         session,
         entity_type="artist_member",
@@ -182,6 +190,9 @@ def _upsert_album(session: Session, artist_id: str, album: ArtistAlbum) -> None:
             "content_type": album.content_type,
         },
     )
+
+    if changes or is_new:
+        existing.last_updated_at = datetime.now(timezone.utc)
 
     if is_new:
         logger.info(
@@ -242,6 +253,9 @@ def _upsert_song(session: Session, song: ArtistSong) -> None:
     for credited in song.artists:
         _upsert_song_artist(session, song.song_id, credited)
 
+    if changes or is_new:
+        existing.last_updated_at = datetime.now(timezone.utc)
+
     if is_new:
         logger.info(
             "[archive] song created id=%s",
@@ -263,20 +277,27 @@ def _upsert_song_artist(session: Session, song_id: str, credited: ArtistDBModel)
     if is_new:
         stub = Artist(artist_id=credited.artist_id, name=credited.name)
         session.add(stub)
-        session.flush()
     changes = update_with_change_log(
         session,
         entity_type="artist",
         entity_id=credited.artist_id,
         obj=stub,
+        skip_log=is_new,
         updates={
             "name": credited.name,
         },
     )
     if is_new:
-        logger.info(f"[archive] artist stub created id={credited.artist_id}")
+        logger.info(
+            "[archive] artist stub created id=%s",
+            credited.artist_id,
+        )
     elif changes:
-        logger.info(f"[archive] artist stub updated id={credited.artist_id} changes={changes}")
+        logger.info(
+            "[archive] artist stub updated id=%s changes=%s",
+            credited.artist_id,
+            changes,
+        )
 
     link = session.exec(
         select(SongArtist).where(
@@ -291,8 +312,11 @@ def _upsert_song_artist(session: Session, song_id: str, credited: ArtistDBModel)
             credited_name=credited.name,
         )
         session.add(link)
-        session.flush()
-        logger.info(f"[archive] credit created {song_id}/{credited.artist_id}")
+        logger.info(
+            "[archive] credit created %s/%s",
+            song_id,
+            credited.artist_id,
+        )
     else:
         changes = update_with_change_log(
             session,
@@ -304,4 +328,9 @@ def _upsert_song_artist(session: Session, song_id: str, credited: ArtistDBModel)
             },
         )
         if changes:
-            logger.info(f"[archive] credit updated {song_id}/{credited.artist_id} changes={changes}")
+            logger.info(
+                "[archive] credit updated %s/%s changes=%s",
+                song_id,
+                credited.artist_id,
+                changes,
+            )
