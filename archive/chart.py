@@ -26,6 +26,7 @@ localtimezone = ZoneInfo("Asia/Seoul")
 
 from melon.models import ChartSong
 from sqlmodel import Session, select, and_
+from src.utils.log import update_with_change_log
 
 from melon import MelonClient
 
@@ -416,7 +417,8 @@ def _archive_graph(
         config = NotHourlyConfig()
 
     for song_graph in graph.graph_data_list:
-        if str(song_graph.song_id) not in archive_songs:
+        str_song_id = str(song_graph.song_id)
+        if str_song_id not in archive_songs:
             continue
 
         for point in song_graph.graph_data:
@@ -437,24 +439,55 @@ def _archive_graph(
                     f"{graph.rank_day} {graph.x_categories[point.x]}",
                     "%Y.%m.%d %H:%M",
                 )
-            item = GraphPoint(
-                song_id=str(song_graph.song_id),
-                resolution=resolution,
-                fetch_batch_at=fetch_batch_at,
-                point_at=point_at.replace(tzinfo=localtimezone),
+            point_at = point_at.replace(tzinfo=localtimezone)
 
-                value=point.value,
-                rank=getattr(
-                    point,
-                    "rank",
-                    None,
-                ),
-            )
-            session.add(item)
+            existing = session.exec(
+                select(GraphPoint)
+                .where(GraphPoint.song_id == str_song_id)
+                .where(GraphPoint.resolution == resolution)
+                .where(GraphPoint.point_at == point_at)
+            ).first()
 
-            logger.info("%s", item.point_at)
+            if existing is None:
+                item = GraphPoint(
+                    song_id=str_song_id,
+                    resolution=resolution,
+                    fetch_batch_at=fetch_batch_at,
+                    point_at=point_at,
 
-            count += 1
+                    value=point.value,
+                    rank=getattr(
+                        point,
+                        "rank",
+                        None,
+                    ),
+                )
+                session.add(item)
+                logger.info("%s", item.point_at)
+                count += 1
+            elif (
+                existing.value != point.value
+                or existing.rank != getattr(point, "rank", None)
+            ):
+                updates = {
+                    "value": point.value,
+                    "rank": getattr(point, "rank", None),
+                }
+                changes = update_with_change_log(
+                    session,
+                    entity_type="graph_point",
+                    entity_id=str(existing.id),
+                    obj=existing,
+                    updates=updates,
+                )
+
+                if changes:
+                    logger.info(
+                        "[graph] changed song=%s point_at=%s: %s",
+                        song_graph.song_id,
+                        point_at,
+                        changes,
+                    )
 
 
     logger.info(
