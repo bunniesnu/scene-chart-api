@@ -367,8 +367,8 @@ class GraphPoint(SQLModel, table=True):
         )
     )
     fetch_batch_at: datetime = Field(default_factory=now)
+    point_at: datetime
 
-    x: int                     # X
     value: float                # VAL
     rank: int | None = None      # RANK (hourly only, from ENTGRAPHDATA)
 

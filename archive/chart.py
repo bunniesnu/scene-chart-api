@@ -1,0 +1,464 @@
+"""
+Archive Melon chart data.
+
+Stores:
+- realtime chart
+- top100 chart
+- daily chart
+- weekly chart
+- hot100 chart
+- chart reports
+- hot100 graphs
+
+All chart tables are append-only snapshots.
+"""
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
+from pydantic import BaseModel
+from typing import Literal, TypeGuard
+
+localtimezone = ZoneInfo("Asia/Seoul")
+
+from melon.models import ChartSong
+from sqlmodel import Session, select, and_
+
+from melon import MelonClient
+
+from src.db.tables import (
+    ChartType,
+    GraphResolution,
+    Song,
+    SongArtist,
+    SongChartSnapshot,
+    ChartReportSnapshot,
+    RankHistoryPoint,
+    GraphPoint,
+)
+from melon.chart import (
+    FiveGraph,
+    ChartGraph,
+)
+
+
+def archive_charts(
+    session: Session,
+    client: MelonClient,
+    artist_id: str,
+) -> None:
+    """
+    Fetch and archive all bulk Melon chart and graph endpoints.
+    """
+
+    logger.info("[chart] archive start")
+
+    archive_songs = list(session.exec(
+        select(Song.song_id)
+        .join(SongArtist, and_(SongArtist.song_id == Song.song_id))
+        .where(SongArtist.artist_id == artist_id)
+    ).all())
+
+    archive_realtime_chart(session, client, archive_songs)
+    archive_top100_chart(session, client, archive_songs)
+    # archive_daily_chart(session, client, artist_id)
+    archive_weekly_chart(session, client, archive_songs)
+    archive_hot100_chart(session, client, archive_songs)
+
+    archive_hot100_graph_hour(session, client, archive_songs)
+    archive_hot100_graph_five(session, client, archive_songs)
+
+    # for song_id in archive_songs:
+    #     archive_chart_report(session, client, song_id)
+
+    try:
+        session.commit()
+    except Exception:
+        logger.exception("[chart] archive failed")
+        session.rollback()
+        raise
+
+    logger.info("[chart] archive complete")
+
+
+# ---------------------------------------------------------------------------
+# Song charts
+# ---------------------------------------------------------------------------
+
+
+def _archive_song_chart(
+    session: Session,
+    chart_type: ChartType,
+    songs: list[ChartSong],
+    archive_songs: list[str],
+    rank_day: str | None,
+    rank_hour: str | None,
+    bypass_and_run: bool = False,
+) -> None:
+    fetched_at = datetime.now(timezone.utc)
+
+    count = 0
+
+    for song in songs:
+        if song.song_id not in archive_songs:
+            continue
+
+        if not bypass_and_run and session.exec(
+            select(SongChartSnapshot)
+            .where(SongChartSnapshot.song_id == song.song_id)
+            .where(SongChartSnapshot.chart_type == chart_type)
+            .where(SongChartSnapshot.rank_day == rank_day)
+            .where(SongChartSnapshot.rank_hour == rank_hour)
+        ).first() is not None:
+            continue
+
+        session.add(
+            SongChartSnapshot(
+                song_id=song.song_id,
+                chart_type=chart_type,
+                fetched_at=fetched_at,
+
+                rank_day=rank_day,
+                rank_hour=rank_hour,
+
+                current_rank=song.current_rank,
+                past_rank=song.past_rank,
+                rank_gap=song.rank_gap,
+                rank_type=song.rank_type,
+            )
+        )
+
+        logger.info(
+            "[chart] %s %s %s (%s)",
+            chart_type,
+            song.title,
+            song.current_rank,
+            f"{"+" if song.is_rising else ("" if song.rank_gap == 0 else "-")}{abs(song.rank_gap)}",
+        )
+
+        count += 1
+
+    logger.info(
+        "[chart] %s %s songs archived for %s %s",
+        chart_type,
+        count,
+        rank_day if rank_day else "",
+        rank_hour if rank_hour else "",
+    )
+
+
+def archive_realtime_chart(
+    session: Session,
+    client: MelonClient,
+    archive_songs: list[str],
+):
+    chart = client.get_realtime_chart()
+
+    _archive_song_chart(
+        session,
+        ChartType.REALTIME,
+        chart.songs,
+        archive_songs,
+        chart.rank_day,
+        chart.rank_hour,
+    )
+
+
+def archive_top100_chart(
+    session: Session,
+    client: MelonClient,
+    archive_songs: list[str],
+):
+    chart = client.get_top100_chart()
+
+    _archive_song_chart(
+        session,
+        ChartType.TOP100,
+        chart.songs,
+        archive_songs,
+        chart.rank_day,
+        chart.rank_hour,
+    )
+
+
+# def archive_daily_chart(
+#     session: Session,
+#     client: MelonClient,
+#     artist_id: str,
+# ):
+#     chart = client.get_daily_chart()
+
+#     _archive_song_chart(
+#         session,
+#         ChartType.DAILY,
+#         chart.songs,
+#         artist_id,
+#         None,
+#         None
+#     )
+
+
+def archive_weekly_chart(
+    session: Session,
+    client: MelonClient,
+    archive_songs: list[str],
+):
+    chart = client.get_weekly_chart()
+
+    _archive_song_chart(
+        session,
+        ChartType.WEEKLY,
+        chart.songs,
+        archive_songs,
+        chart.end_day,
+        None,
+    )
+
+
+def archive_hot100_chart(
+    session: Session,
+    client: MelonClient,
+    archive_songs: list[str],
+):
+    chart = client.get_hot100_chart()
+
+    _archive_song_chart(
+        session,
+        ChartType.HOT100,
+        chart.songs,
+        archive_songs,
+        chart.rank_day,
+        chart.rank_hour,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Chart report
+# ---------------------------------------------------------------------------
+
+
+def archive_chart_report(
+    session: Session,
+    client: MelonClient,
+    song_id: str,
+):
+    """
+    Archive one song's detailed chart report.
+    """
+
+    report = client.get_chart_report(song_id)
+    if report is None:
+        return
+
+    snapshot = ChartReportSnapshot(
+        song_id=song_id,
+        fetched_at=datetime.now(timezone.utc),
+
+        recent_time=getattr(
+            report,
+            "recent_time",
+            None,
+        ),
+
+        current_rank=report.song_info.current_rank,
+        past_rank=report.song_info.past_rank,
+        rank_gap=report.song_info.rank_gap,
+        rank_type=report.song_info.rank_type,
+
+        listener_one_hour=(
+            report.listener_data.one_hour
+            if report.listener_data
+            else None
+        ),
+
+        listener_one_day=(
+            report.listener_data.one_day
+            if report.listener_data
+            else None
+        ),
+    )
+
+    session.add(snapshot)
+
+
+    for point in report.rank_chart.data:
+        session.add(
+            RankHistoryPoint(
+                report_snapshot_id=snapshot.id,
+                is_predicted=False,
+
+                x_index=point.x_index,
+                value=point.value,
+                label=point.label,
+            )
+        )
+
+
+    for point in (
+        report.rank_chart.predicted_data
+        or []
+    ):
+        session.add(
+            RankHistoryPoint(
+                report_snapshot_id=snapshot.id,
+                is_predicted=True,
+
+                x_index=point.x_index,
+                value=point.value,
+                label=point.label,
+            )
+        )
+
+
+    logger.info(
+        "[chart-report] %s",
+        song_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Hot100 graphs
+# ---------------------------------------------------------------------------
+
+
+def archive_hot100_graph_hour(
+    session: Session,
+    client: MelonClient,
+    archive_songs: list[str],
+):
+    graph = client.get_hot100_graph_hour()
+
+    _archive_graph(
+        session,
+        graph,
+        GraphResolution.HOURLY,
+        archive_songs,
+    )
+
+
+def archive_hot100_graph_five(
+    session: Session,
+    client: MelonClient,
+    archive_songs: list[str],
+):
+    graph = client.get_hot100_graph_five()
+
+    _archive_graph(
+        session,
+        graph,
+        GraphResolution.FIVE_MIN,
+        archive_songs,
+    )
+
+
+def hourly_config(rank_day: str, x_categories: list[str]):
+    new_rank_day = datetime.strptime(
+        rank_day,
+        "%Y.%m.%d",
+    )
+
+    hours = [
+        int(category.removesuffix("시"))
+        for category in x_categories
+    ]
+
+    midnight_index = next(
+        (
+            i
+            for i in range(1, len(hours))
+            if hours[i] < hours[i - 1]
+        ),
+        None,
+    )
+
+    return new_rank_day, hours, midnight_index
+
+
+class NotHourlyConfig(BaseModel):
+    is_hourly: Literal[False] = False
+
+class IsHourlyConfig(BaseModel):
+    is_hourly: Literal[True] = True
+    rank_day: datetime
+    hours: list[int]
+    midnight_index: int | None
+
+Config = IsHourlyConfig | NotHourlyConfig
+
+def is_hourly_config(
+    config: Config,
+) -> TypeGuard[IsHourlyConfig]:
+    return config.is_hourly
+
+
+def _archive_graph(
+    session: Session,
+    graph: ChartGraph | FiveGraph,
+    resolution: GraphResolution,
+    archive_songs: list[str],
+):
+    fetch_batch_at = datetime.now(timezone.utc)
+
+    count = 0
+
+    is_hourly = "시" in graph.x_categories[0]
+    if is_hourly:
+        rank_day, hours, midnight_index = hourly_config(graph.rank_day, graph.x_categories)
+        config = IsHourlyConfig(
+            rank_day=rank_day,
+            hours=hours,
+            midnight_index=midnight_index,
+        )
+    else:
+        config = NotHourlyConfig()
+
+    for song_graph in graph.graph_data_list:
+        if str(song_graph.song_id) not in archive_songs:
+            continue
+
+        for point in song_graph.graph_data:
+            if is_hourly_config(config):
+                hour = config.hours[point.x]
+
+                point_at = config.rank_day.replace(
+                    hour=hour,
+                    minute=0,
+                    second=0,
+                    microsecond=0,
+                )
+
+                if config.midnight_index is not None and point.x < config.midnight_index:
+                    point_at -= timedelta(days=1)
+            else:
+                point_at = datetime.strptime(
+                    f"{graph.rank_day} {graph.x_categories[point.x]}",
+                    "%Y.%m.%d %H:%M",
+                )
+            item = GraphPoint(
+                song_id=str(song_graph.song_id),
+                resolution=resolution,
+                fetch_batch_at=fetch_batch_at,
+                point_at=point_at.replace(tzinfo=localtimezone),
+
+                value=point.value,
+                rank=getattr(
+                    point,
+                    "rank",
+                    None,
+                ),
+            )
+            session.add(item)
+
+            logger.info("%s", item.point_at)
+
+            count += 1
+
+
+    logger.info(
+        "[graph] %s +%s",
+        resolution.value,
+        count,
+    )
