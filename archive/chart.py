@@ -13,9 +13,7 @@ Stores:
 All chart tables are append-only snapshots.
 """
 
-import logging
-
-logger = logging.getLogger(__name__)
+from src.utils.logger import logger
 
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
