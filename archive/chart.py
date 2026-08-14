@@ -72,8 +72,8 @@ def archive_charts(
     archive_hot100_graph_hour(session, client, archive_songs)
     archive_hot100_graph_five(session, client, archive_songs)
 
-    # for song_id in archive_songs:
-    #     archive_chart_report(session, client, song_id)
+    for song_id in archive_songs:
+        archive_chart_report(session, client, song_id)
 
     try:
         session.commit()
@@ -253,16 +253,31 @@ def archive_chart_report(
     report = client.get_chart_report(song_id)
     if report is None:
         return
+    
+    recent_time = report.recent_time
+    report_date = datetime.now(localtimezone).date()
+
+    existing = session.exec(
+        select(ChartReportSnapshot)
+        .where(ChartReportSnapshot.song_id == song_id)
+        .where(ChartReportSnapshot.report_date == report_date)
+        .where(ChartReportSnapshot.recent_time == recent_time)
+    ).first()
+
+    if existing is not None:
+        logger.info(
+            "[chart-report] %s already archived at %s",
+            song_id,
+            recent_time,
+        )
+        return
 
     snapshot = ChartReportSnapshot(
         song_id=song_id,
         fetched_at=datetime.now(timezone.utc),
 
-        recent_time=getattr(
-            report,
-            "recent_time",
-            None,
-        ),
+        recent_time=recent_time,
+        report_date=report_date,
 
         current_rank=report.song_info.current_rank,
         past_rank=report.song_info.past_rank,

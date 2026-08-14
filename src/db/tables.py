@@ -14,7 +14,7 @@ Design notes
   ALLCAPS JSON key so you can trace each column back to the source payload.
 """
 
-from datetime import datetime
+from datetime import datetime, date
 from enum import Enum
 import uuid
 
@@ -288,6 +288,12 @@ class ChartReportSnapshot(SQLModel, table=True):
             "song_id",
             "fetched_at",
         ),
+        Index(
+            "ix_chartreportsnapshot_song_report_date",
+            "song_id",
+            "report_date",
+            "recent_time",
+        ),
     )
 
     id: uuid.UUID = Field(
@@ -298,6 +304,7 @@ class ChartReportSnapshot(SQLModel, table=True):
     song_id: str = Field(foreign_key="song.song_id")
     fetched_at: datetime = Field(default_factory=now)
     recent_time: str | None = None       # RECENTTIME
+    report_date: date
 
     current_rank: int                    # SONGINFO.CURRANK
     past_rank: int                       # SONGINFO.PASTRANK
