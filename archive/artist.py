@@ -9,7 +9,10 @@ Re-running it on a schedule (e.g. hourly, via cron/Celery) keeps the dimension
 tables up to date while preserving metadata change history.
 """
 
-from src.utils.logger import logger
+from src.utils.logger import archive_log
+import logging
+
+logger = logging.getLogger(__name__)
 
 from datetime import datetime, timezone
 
@@ -30,6 +33,7 @@ from src.db.tables import (
 from src.utils.log import update_with_change_log
 
 
+@archive_log
 def archive_artist(session: Session, client: MelonClient, artist_id: str) -> Artist:
     """Fetch and archive all available artist metadata for `artist_id`.
 

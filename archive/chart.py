@@ -13,7 +13,10 @@ Stores:
 All chart tables are append-only snapshots.
 """
 
-from src.utils.logger import logger
+from src.utils.logger import archive_log
+import logging
+
+logger = logging.getLogger(__name__)
 
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
@@ -46,6 +49,7 @@ from melon.chart import (
 )
 
 
+@archive_log
 def archive_charts(
     session: Session,
     client: MelonClient,
