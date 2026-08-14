@@ -45,14 +45,14 @@ def update_with_change_log(
             "new": new_value,
         }
 
-        if not skip_log and old_value is not None:
+        if not skip_log:
             session.add(
                 ArchiveChangeLog(
                     entity_type=entity_type,
                     entity_id=str(entity_id),
                     field_name=field,
-                    old_value=str(old_value),
-                    new_value=str(new_value),
+                    old_value=None if old_value is None else str(old_value),
+                    new_value=None if new_value is None else str(new_value),
                 )
             )
 
