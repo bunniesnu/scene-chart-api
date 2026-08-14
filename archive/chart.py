@@ -21,6 +21,8 @@ from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from pydantic import BaseModel
 from typing import Literal, TypeGuard
+import pathlib
+import hashlib
 
 localtimezone = ZoneInfo("Asia/Seoul")
 
@@ -65,7 +67,7 @@ def archive_charts(
 
     archive_realtime_chart(session, client, archive_songs)
     archive_top100_chart(session, client, archive_songs)
-    # archive_daily_chart(session, client, artist_id)
+    archive_daily_chart(session, client, archive_songs)
     archive_weekly_chart(session, client, archive_songs)
     archive_hot100_chart(session, client, archive_songs)
 
@@ -185,21 +187,44 @@ def archive_top100_chart(
     )
 
 
-# def archive_daily_chart(
-#     session: Session,
-#     client: MelonClient,
-#     artist_id: str,
-# ):
-#     chart = client.get_daily_chart()
+def get_comparable_hash(comparable_text: str):
+    return hashlib.sha256(
+        comparable_text.encode()
+    ).hexdigest()
 
-#     _archive_song_chart(
-#         session,
-#         ChartType.DAILY,
-#         chart.songs,
-#         artist_id,
-#         None,
-#         None
-#     )
+
+def archive_daily_chart(
+    session: Session,
+    client: MelonClient,
+    archive_songs: list[str],
+):
+    chart = client.get_daily_chart()
+
+    cursor_path = pathlib.Path("/app/cursor/daily.json")
+
+    old_cursor = None
+    if cursor_path.exists():
+        old_cursor = cursor_path.read_text().strip()
+
+    new_comparable_text = chart.model_dump_json(exclude_none=False)
+    new_cursor = get_comparable_hash(new_comparable_text)
+
+    if old_cursor == new_cursor:
+        logger.info("[chart] daily chart unchanged")
+        return
+
+    _archive_song_chart(
+        session,
+        ChartType.DAILY,
+        chart.songs,
+        archive_songs,
+        None,
+        None,
+        bypass_and_run=True
+    )
+
+    cursor_path.parent.mkdir(parents=True, exist_ok=True)
+    cursor_path.write_text(new_cursor)
 
 
 def archive_weekly_chart(

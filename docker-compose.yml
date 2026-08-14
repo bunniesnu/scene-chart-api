@@ -17,6 +17,7 @@ services:
     build: .
     volumes:
       - ./data/log/app:/app/logs
+      - ./data/cursor:/app/cursor
     environment:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
     depends_on:
