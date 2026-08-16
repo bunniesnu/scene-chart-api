@@ -1,18 +1,4 @@
 services:
-  db:
-    image: pgvector/pgvector:pg16
-    environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
-    volumes:
-      - db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
   app:
     build:
       context: .
@@ -26,9 +12,6 @@ services:
       "
     environment:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
-    depends_on:
-      db:
-        condition: service_healthy
     restart: unless-stopped
   scheduler:
     build:
@@ -41,10 +24,6 @@ services:
       - ./data/cursor:/app/cursor
       - ./crontab:/app/crontab:ro
     command: ["supercronic", "/app/crontab"]
-    depends_on:
-      db:
-        condition: service_healthy
     restart: unless-stopped
 
 volumes:
-  db_data:
