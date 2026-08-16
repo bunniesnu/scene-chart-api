@@ -5,6 +5,7 @@ tests/
 .dockerignore
 .env*
 .gitignore
+crontab
 docker-compose.yml
 Makefile
 README.md
