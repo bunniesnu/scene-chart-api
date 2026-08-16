@@ -378,8 +378,10 @@ def archive_chart_report(
 
 
     logger.info(
-        "[chart-report] %s",
+        "[chart-report] %s archived at %s %s",
         song_id,
+        report_date,
+        recent_time,
     )
 
 
