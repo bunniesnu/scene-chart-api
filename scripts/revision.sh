@@ -17,7 +17,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-sed 's/image: pgvector\/pgvector:pg16/image: pgvector\/pgvector:pg16\n    ports:\n      - "5432:5432"/' docker-compose.yml > $OVERRIDE_FILE
+sed 's/image: pgvector\/pgvector:pg16/image: pgvector\/pgvector:pg16\n    ports:\n      - "5432:5432"/' docker/docker-compose.yml > $OVERRIDE_FILE
 
 docker compose -f $OVERRIDE_FILE down
 docker volume rm ${PROJECT_NAME}_db_data || true

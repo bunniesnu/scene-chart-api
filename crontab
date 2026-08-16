@@ -1,0 +1,2 @@
+3 * * * * cd /app && uv run python -m jobs.archive_artist
+1-59/5 * * * * cd /app && uv run python -m jobs.archive_charts

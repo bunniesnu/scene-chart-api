@@ -1,5 +1,5 @@
 PROJECT_NAME ?= scene-chart-api
-COMPOSE := docker compose -f ./docker-compose.yml --project-directory . -p "$(PROJECT_NAME)"
+COMPOSE := docker compose -f ./docker/docker-compose.yml --project-directory . -p "$(PROJECT_NAME)"
 
 .PHONY: build stop run revision logs main
 

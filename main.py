@@ -8,13 +8,15 @@ from src.db.db import engine
 ARTIST_ID = "3709231"
 
 
-def main() -> None:
+def run_archive_artist():
     client = MelonClient()
 
     with Session(engine) as session:
         archive_artist(session, client, ARTIST_ID)
+
+
+def run_archive_charts():
+    client = MelonClient()
+
+    with Session(engine) as session:
         archive_charts(session, client, ARTIST_ID)
-
-
-if __name__ == "__main__":
-    main()
