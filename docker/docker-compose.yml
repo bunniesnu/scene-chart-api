@@ -25,7 +25,7 @@ services:
         --port 8000
       "
     environment:
-      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
     depends_on:
       db:
         condition: service_healthy
@@ -35,7 +35,7 @@ services:
       context: .
       dockerfile: docker/scheduler/Dockerfile
     environment:
-      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
     volumes:
       - ./data/log/app:/app/logs
       - ./data/cursor:/app/cursor
