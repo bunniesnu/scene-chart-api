@@ -20,4 +20,4 @@ logs:
 	$(COMPOSE) logs -f
 
 main:
-	$(COMPOSE) exec app uv run --no-sync main.py
+	$(COMPOSE) exec scheduler uv run --no-sync main.py

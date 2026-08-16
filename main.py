@@ -1,3 +1,5 @@
+import traceback
+
 from melon import MelonClient
 from sqlmodel import Session
 
@@ -17,6 +19,7 @@ def run_archive_artist():
             archive_artist(session, client, ARTIST_ID)
     except Exception as e:
         send_something_went_wrong(e)
+        return traceback.format_exc()
 
 
 def run_archive_charts():
@@ -27,6 +30,7 @@ def run_archive_charts():
             archive_charts(session, client, ARTIST_ID)
     except Exception as e:
         send_something_went_wrong(e)
+        return traceback.format_exc()
 
 if __name__ == "__main__":
     run_archive_artist()

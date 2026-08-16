@@ -42,6 +42,9 @@ def archive_log(func: Callable[P, R]) -> Callable[P, R]:
 
         try:
             return func(*args, **kwargs)
+        except Exception:
+            logger.exception("Archive failed")
+            raise
         finally:
             root_logger.removeHandler(file_handler)
             file_handler.close()
