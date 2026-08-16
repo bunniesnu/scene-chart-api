@@ -324,15 +324,15 @@ wheels = [
 
 [[package]]
 name = "melon-api-client"
-version = "0.2.4"
+version = "0.2.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/40/3b/ec04403174520143509abc88f9b0e1505a2674dcda247c36a3bda307872c/melon_api_client-0.2.4.tar.gz", hash = "sha256:6e48d2025b6b6d5482a5bc8904a5967659de9bac78cda42121f9ad8a24904d22", size = 49983, upload-time = "2026-08-16T15:55:39.72Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/06/02/ad377f40b09d09093a618531ff673a83bddff3e6021b289a5bd6e3d2baeb/melon_api_client-0.2.5.tar.gz", hash = "sha256:1f81086850dbc15b44ce2ec95fbb1377ac6f947f5febff29274cb544101e65fa", size = 50017, upload-time = "2026-08-16T16:32:06.88Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c3/8b/2f11ffe6bdf75afc152c36c256c5048820855a2d44537a5b6d74c285fee0/melon_api_client-0.2.4-py3-none-any.whl", hash = "sha256:13c4dc28dbd009fc62c9bd23249efd496e16a95fbf0e2c71890ec20fb175e9a4", size = 20494, upload-time = "2026-08-16T15:55:38.457Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/0c/e661ed5175495a74668225b95426d589fae76d5ec010e057371180e39f86/melon_api_client-0.2.5-py3-none-any.whl", hash = "sha256:10b4170c9e1a9f8394b1465ff452494c769db19924871930e2f7dd5168df1830", size = 20496, upload-time = "2026-08-16T16:32:05.607Z" },
 ]
 
 [[package]]
@@ -492,7 +492,7 @@ dev = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.19.0" },
     { name = "fastapi", specifier = ">=0.141.1" },
-    { name = "melon-api-client", specifier = ">=0.2.4" },
+    { name = "melon-api-client", specifier = ">=0.2.5" },
     { name = "psycopg2-binary", specifier = ">=2.9.12" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "requests", specifier = ">=2.34.2" },

@@ -410,6 +410,10 @@ def archive_hot100_graph_five(
 ):
     graph = client.get_hot100_graph_five()
 
+    if graph is None:
+        logger.info("[graph] hot100 five graph is None")
+        return
+
     _archive_graph(
         session,
         graph,
