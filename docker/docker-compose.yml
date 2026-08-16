@@ -19,11 +19,10 @@ services:
       dockerfile: docker/scheduler/Dockerfile
     environment:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
+      WEBHOOK_URL: ${WEBHOOK_URL}
     volumes:
       - ./data/log/app:/app/logs
       - ./data/cursor:/app/cursor
       - ./crontab:/app/crontab:ro
     command: ["supercronic", "/app/crontab"]
     restart: unless-stopped
-
-volumes:

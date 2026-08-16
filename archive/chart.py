@@ -48,6 +48,8 @@ from melon.chart import (
     ChartGraph,
 )
 
+from src.utils.webhook import send_discord_webhook, ChartUpdate
+
 
 @archive_log
 def archive_charts(
@@ -107,6 +109,8 @@ def _archive_song_chart(
 
     count = 0
 
+    updates: list[ChartUpdate] = []
+
     for song in songs:
         if song.song_id not in archive_songs:
             continue
@@ -144,7 +148,24 @@ def _archive_song_chart(
             f"{"+" if song.is_rising else ("" if song.rank_gap == 0 else "-")}{abs(song.rank_gap)}",
         )
 
+        updates.append(
+            ChartUpdate(
+                name=song.title,
+                new_value=song.current_rank,
+                is_rising=song.is_rising,
+                rank_gap=song.rank_gap,
+            )
+        )
+
         count += 1
+
+    if count > 0:
+        send_discord_webhook(
+            chart_name="Melon",
+            chart_type=chart_type.name,
+            timeinfo=f"{rank_day} {rank_hour}" if rank_day and rank_hour else (rank_day if rank_day else (rank_hour if rank_hour else "")),
+            updates=updates
+        )
 
     logger.info(
         "[chart] %s %s songs archived for %s %s",

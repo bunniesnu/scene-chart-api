@@ -4,19 +4,30 @@ from sqlmodel import Session
 from archive.artist import archive_artist
 from archive.chart import archive_charts
 from src.db.db import engine
+from src.utils.webhook import send_something_went_wrong
 
 ARTIST_ID = "3709231"
 
 
 def run_archive_artist():
-    client = MelonClient()
+    try:
+        client = MelonClient()
 
-    with Session(engine) as session:
-        archive_artist(session, client, ARTIST_ID)
+        with Session(engine) as session:
+            archive_artist(session, client, ARTIST_ID)
+    except Exception as e:
+        send_something_went_wrong(e)
 
 
 def run_archive_charts():
-    client = MelonClient()
+    try:
+        client = MelonClient()
 
-    with Session(engine) as session:
-        archive_charts(session, client, ARTIST_ID)
+        with Session(engine) as session:
+            archive_charts(session, client, ARTIST_ID)
+    except Exception as e:
+        send_something_went_wrong(e)
+
+if __name__ == "__main__":
+    run_archive_artist()
+    run_archive_charts()
