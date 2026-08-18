@@ -52,6 +52,36 @@ from src.utils.webhook import send_discord_webhook, ChartUpdate
 
 
 @archive_log
+def archive_charts_midnight(
+    session: Session,
+    client: MelonClient,
+    artist_id: str,
+) -> None:
+    """
+    Fetch and archive TOP100 chart at midnight.
+    """
+
+    logger.info("[chart] archive start (midnight)")
+
+    archive_songs = list(session.exec(
+        select(Song.song_id)
+        .join(SongArtist, and_(SongArtist.song_id == Song.song_id))
+        .where(SongArtist.artist_id == artist_id)
+    ).all())
+
+    archive_top100_chart(session, client, archive_songs)
+
+    try:
+        session.commit()
+    except Exception:
+        logger.exception("[chart] archive failed")
+        session.rollback()
+        raise
+
+    logger.info("[chart] archive complete")
+
+
+@archive_log
 def archive_charts(
     session: Session,
     client: MelonClient,
