@@ -3,7 +3,6 @@ set -e
 cd "$(dirname "$0")/.." || exit 1
 source .env
 
-OVERRIDE_FILE="docker-compose.db-expose.yml"
 REVISION_FILE=""
 COMPLETED=0
 
@@ -12,23 +11,11 @@ cleanup() {
     echo "Interrupted — removing generated revision file: $REVISION_FILE"
     rm -f "$REVISION_FILE"
   fi
-  docker compose -f "$OVERRIDE_FILE" down
   rm -f "$OVERRIDE_FILE"
 }
 trap cleanup EXIT
 
-sed 's/image: pgvector\/pgvector:pg16/image: pgvector\/pgvector:pg16\n    ports:\n      - "5432:5432"/' docker/docker-compose.yml > $OVERRIDE_FILE
-
-docker compose -f $OVERRIDE_FILE down
-docker volume rm ${PROJECT_NAME}_db_data || true
-docker compose -f $OVERRIDE_FILE up -d --build db
-
-DATABASE_URL=postgresql://$DB_USER:$DB_PASSWORD@localhost:5432/$DB_NAME
-
-# Wait for db to be ready
-until docker compose -f $OVERRIDE_FILE exec db pg_isready -U $DB_USER -d $DB_NAME; do
-  sleep 1
-done
+DATABASE_URL=postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME
 
 DATABASE_URL=$DATABASE_URL uv run alembic upgrade head
 file_path=$(DATABASE_URL="$DATABASE_URL" uv run alembic revision --autogenerate -m "$1")
