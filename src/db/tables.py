@@ -239,6 +239,13 @@ class SongChartSnapshot(SQLModel, table=True):
 
     __table_args__ = (
         Index(
+            "ix_songchartsnapshot_song_chart_ranktime",
+            "song_id",
+            "chart_type",
+            "rank_day",
+            "rank_hour",
+        ),
+        Index(
             "ix_songchartsnapshot_song_chart_fetched",
             "song_id",
             "chart_type",
