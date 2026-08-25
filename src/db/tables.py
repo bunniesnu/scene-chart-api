@@ -165,6 +165,7 @@ class Album(SQLModel, table=True):
     issue_date: str | None = None                          # ISSUEDATE
     song_count: int | None = None                          # SONGCNT
     content_type: str | None = None                        # CTYPE
+    cover_url: str | None = None                            # ALBUMIMGLARGE
     first_seen_at: datetime = Field(default_factory=now)
     last_updated_at: datetime = Field(default_factory=now)
 
