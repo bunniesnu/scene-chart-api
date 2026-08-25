@@ -191,6 +191,7 @@ def _upsert_album(session: Session, artist_id: str, album: ArtistAlbum) -> None:
             "issue_date": album.issue_date,
             "song_count": album.song_cnt,
             "content_type": album.content_type,
+            "cover_url": album.album_img_large,
         },
     )
 
