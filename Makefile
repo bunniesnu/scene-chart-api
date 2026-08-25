@@ -1,7 +1,8 @@
 PROJECT_NAME ?= scene-chart-api
-COMPOSE := docker compose -f ./docker/docker-compose.yml --project-directory . -p "$(PROJECT_NAME)"
+DOCKER_COMPOSE_FILE ?= ./docker/docker-compose.yml
+COMPOSE := docker compose -f $(DOCKER_COMPOSE_FILE) --project-directory . -p "$(PROJECT_NAME)"
 
-.PHONY: build stop run revision logs main
+.PHONY: build stop run local revision logs main
 
 build:
 	COMPOSE_BAKE=true $(COMPOSE) build
@@ -11,6 +12,9 @@ stop:
 
 run: build stop
 	$(COMPOSE) up -d
+
+local: build stop
+	PROJECT_NAME="$(PROJECT_NAME)" DOCKER_COMPOSE_FILE="$(DOCKER_COMPOSE_FILE)" ./scripts/local.sh
 
 revision:
 	@test -n "$(MSG)" || (echo "Usage: make revision MSG='message'" && exit 1)
