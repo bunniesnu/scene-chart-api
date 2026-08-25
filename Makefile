@@ -19,5 +19,7 @@ revision:
 logs:
 	$(COMPOSE) logs -f
 
-main:
-	$(COMPOSE) exec scheduler uv run --no-sync main.py
+main: build stop
+	$(COMPOSE) up -d app
+	$(COMPOSE) exec app uv run --no-sync main.py
+	$(COMPOSE) down

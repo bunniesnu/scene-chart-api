@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 from datetime import datetime, timezone
 
 from melon.models import ArtistAlbum, Artist as ArtistDBModel, ArtistDetail, ArtistSong
+from melon.models.album import Album as AlbumDBModel
 from melon.models.artist import ArtistMember as ArtistMemberDBModel
 from sqlmodel import Session, select
 
@@ -54,7 +55,8 @@ def archive_artist(session: Session, client: MelonClient, artist_id: str) -> Art
 
     albums = client.get_artist_albums(artist_id)
     for album in albums.albums:
-        _upsert_album(session, artist_id, album)
+        album_info = client.get_album_info(album.album_id)
+        _upsert_album(session, artist_id, album, album_info.album)
 
     songs = client.get_artist_songs(artist_id)
     for song in songs.songs:
@@ -167,7 +169,7 @@ def _upsert_member(session: Session, artist_id: str, member: ArtistMemberDBModel
         )
 
 
-def _upsert_album(session: Session, artist_id: str, album: ArtistAlbum) -> None:
+def _upsert_album(session: Session, artist_id: str, album: ArtistAlbum, album_info: AlbumDBModel) -> None:
     existing = session.get(Album, album.album_id)
     is_new = existing is None
     if is_new:
@@ -177,7 +179,7 @@ def _upsert_album(session: Session, artist_id: str, album: ArtistAlbum) -> None:
             issue_date=album.issue_date,
             song_count=album.song_cnt,
             content_type=album.content_type,
-            cover_url=album.album_img_large,
+            cover_url=album_info.album_img_large,
         )
         session.add(existing)
     changes = update_with_change_log(
@@ -191,7 +193,7 @@ def _upsert_album(session: Session, artist_id: str, album: ArtistAlbum) -> None:
             "issue_date": album.issue_date,
             "song_count": album.song_cnt,
             "content_type": album.content_type,
-            "cover_url": album.album_img_large,
+            "cover_url": album_info.album_img_large,
         },
     )
 
