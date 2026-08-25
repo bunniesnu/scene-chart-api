@@ -1,0 +1,46 @@
+from datetime import datetime
+from pydantic import BaseModel, ConfigDict
+from uuid import UUID
+
+from src.db.tables import ChartType
+
+
+class APIModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SongResponse(APIModel):
+    song_id: str
+    title: str
+    album_id: str | None
+    album_cover_url: str | None
+    play_time: int | None
+    issue_date: str | None
+    is_title_song: bool | None
+
+
+class SongChartSnapshotResponse(APIModel):
+    id: UUID
+    song_id: str
+
+    chart_type: ChartType
+    fetched_at: datetime
+
+    rank_day: str | None
+    rank_hour: str | None
+
+    current_rank: int
+    past_rank: int
+    rank_gap: int
+    rank_type: str
+
+
+class ChartEntryResponse(APIModel):
+    song: SongResponse
+    snapshot: SongChartSnapshotResponse
+
+
+class ChartResponse(APIModel):
+    chart_type: ChartType
+    fetched_at: datetime
+    entries: list[ChartEntryResponse]
