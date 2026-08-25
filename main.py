@@ -5,10 +5,9 @@ from sqlmodel import Session
 
 from archive.artist import archive_artist
 from archive.chart import archive_charts, archive_charts_midnight
+from src.const import ARTIST_ID
 from src.db.db import engine
 from src.utils.webhook import send_something_went_wrong
-
-ARTIST_ID = "3709231"
 
 
 def run_archive_artist():
