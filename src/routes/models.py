@@ -44,3 +44,19 @@ class ChartResponse(APIModel):
     chart_type: ChartType
     fetched_at: datetime
     entries: list[ChartEntryResponse]
+
+
+class ChartHistorySnapshotResponse(APIModel):
+    current_rank: int
+    rank_day: str | None
+    rank_hour: str | None
+
+
+class ChartHistoryEntryResponse(APIModel):
+    song: SongResponse
+    snapshots: list[ChartHistorySnapshotResponse]
+
+
+class ChartHistoryResponse(APIModel):
+    chart_type: ChartType
+    entries: list[ChartHistoryEntryResponse]
