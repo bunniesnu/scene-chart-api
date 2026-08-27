@@ -111,7 +111,7 @@ def get_chart_history(
 
     return ChartHistoryResponse(
         chart_type=chart_type,
-        entries=ChartHistoryEntryResponse(
+        entry=ChartHistoryEntryResponse(
             song=SongResponse(
                 song_id=song.song_id,
                 title=song.title,
