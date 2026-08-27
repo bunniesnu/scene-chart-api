@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 cd "$(dirname "$0")/.." || exit 1
-source .env
 
 REVISION_FILE=""
 COMPLETED=0
@@ -11,11 +10,10 @@ cleanup() {
     echo "Interrupted — removing generated revision file: $REVISION_FILE"
     rm -f "$REVISION_FILE"
   fi
-  rm -f "$OVERRIDE_FILE"
 }
 trap cleanup EXIT
 
-DATABASE_URL=postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME
+DATABASE_URL=postgresql://user:password@localhost:5432/db
 
 DATABASE_URL=$DATABASE_URL uv run alembic upgrade head
 file_path=$(DATABASE_URL="$DATABASE_URL" uv run alembic revision --autogenerate -m "$1")
