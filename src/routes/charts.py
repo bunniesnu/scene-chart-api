@@ -87,7 +87,7 @@ def get_chart_history(
     session: Session = Depends(get_session),
     songId: str = Query(),
 ):
-    snapshots = session.exec(
+    song_snapshots = session.exec(
         select(SongChartSnapshot, Song)
         .join(Song, and_(Song.song_id == SongChartSnapshot.song_id))
         .join(SongArtist, and_(SongArtist.song_id == Song.song_id))
@@ -97,39 +97,36 @@ def get_chart_history(
             SongChartSnapshot.song_id == songId,
         )
         .order_by(
-            SongChartSnapshot.song_id,
             col(SongChartSnapshot.rank_day).asc(),
             col(SongChartSnapshot.rank_hour).asc(),
         )
     ).all()
 
-    song_snapshots: dict[str, tuple[Song, list[SongChartSnapshot]]] = {}
-
-    for snapshot, song in snapshots:
-        if song.song_id not in song_snapshots:
-            song_snapshots[song.song_id] = (song, [])
-        song_snapshots[song.song_id][1].append(snapshot)
+    song = song_snapshots[0][1] if song_snapshots else None
+    if not song:
+        raise HTTPException(
+            status_code=404,
+            detail="No chart history found for the given song ID",
+        )
 
     return ChartHistoryResponse(
         chart_type=chart_type,
-        entries=[
-            ChartHistoryEntryResponse(
-                song=SongResponse(
-                    song_id=song.song_id,
-                    title=song.title,
-                    album_id=song.album_id,
-                    album_cover_url=(song.album.cover_url if song.album else None),
-                    play_time=song.play_time,
-                    issue_date=song.issue_date,
-                    is_title_song=song.is_title_song,
-                ),
-                snapshots=[
-                    ChartHistorySnapshotResponse(
-                        current_rank=snapshot.current_rank,
-                        rank_day=snapshot.rank_day,
-                        rank_hour=snapshot.rank_hour,
-                    ) for snapshot in snapshots
-                ]
-            ) for song, snapshots in song_snapshots.values()
-        ],
+        entries=ChartHistoryEntryResponse(
+            song=SongResponse(
+                song_id=song.song_id,
+                title=song.title,
+                album_id=song.album_id,
+                album_cover_url=(song.album.cover_url if song.album else None),
+                play_time=song.play_time,
+                issue_date=song.issue_date,
+                is_title_song=song.is_title_song,
+            ),
+            snapshots=[
+                ChartHistorySnapshotResponse(
+                    current_rank=snapshot.current_rank,
+                    rank_day=snapshot.rank_day,
+                    rank_hour=snapshot.rank_hour,
+                ) for snapshot, _ in song_snapshots
+            ]
+        )
     )

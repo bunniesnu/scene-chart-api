@@ -59,7 +59,7 @@ class ChartHistoryEntryResponse(APIModel):
 
 class ChartHistoryResponse(APIModel):
     chart_type: ChartType
-    entries: list[ChartHistoryEntryResponse]
+    entry: ChartHistoryEntryResponse
 
 
 class ArtistSongsResponse(APIModel):
