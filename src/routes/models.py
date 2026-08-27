@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from pydantic import BaseModel, ConfigDict
 from uuid import UUID
 
@@ -26,7 +26,7 @@ class SongChartSnapshotResponse(APIModel):
     chart_type: ChartType
     fetched_at: datetime
 
-    rank_day: str | None
+    rank_day: date
     rank_hour: str | None
 
     current_rank: int
@@ -48,7 +48,7 @@ class ChartResponse(APIModel):
 
 class ChartHistorySnapshotResponse(APIModel):
     current_rank: int
-    rank_day: str | None
+    rank_day: date
     rank_hour: str | None
 
 
