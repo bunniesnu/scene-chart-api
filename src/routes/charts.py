@@ -1,3 +1,4 @@
+from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlmodel import Session, select, and_, col
@@ -86,6 +87,8 @@ def get_chart_history(
     chart_type: ChartType,
     session: Session = Depends(get_session),
     songId: str = Query(),
+    fromDate: date | None = Query(default=None, alias="from"),
+    toDate: date | None = Query(default=None, alias="to"),
 ):
     song_snapshots = session.exec(
         select(SongChartSnapshot, Song)
@@ -95,6 +98,8 @@ def get_chart_history(
             SongArtist.artist_id == ARTIST_ID,
             SongChartSnapshot.chart_type == chart_type,
             SongChartSnapshot.song_id == songId,
+            (SongChartSnapshot.rank_day >= fromDate if fromDate else True),
+            (SongChartSnapshot.rank_day <= toDate if toDate else True),
         )
         .order_by(
             col(SongChartSnapshot.rank_day).asc(),
