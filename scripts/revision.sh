@@ -22,8 +22,4 @@ file_path=$(DATABASE_URL="$DATABASE_URL" uv run alembic revision --autogenerate 
 REVISION_FILE=$(echo "$file_path" | grep -oE '/[^ ]+\.py' | tail -n 1)
 
 echo "Migration file generated at: $REVISION_FILE"
-echo "Edit it, then press Enter to run upgrade head..."
-read -r
-DATABASE_URL=$DATABASE_URL uv run alembic upgrade head
-
 COMPLETED=1
