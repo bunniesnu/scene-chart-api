@@ -23,7 +23,7 @@ local:
 
 revision:
 	@test -n "$(MSG)" || (echo "Usage: make revision MSG='message'" && exit 1)
-	./scripts/revision.sh "$(MSG)"
+	LOCAL_PROJECT_NAME=$(LOCAL_PROJECT_NAME) LOCAL_DOCKER_COMPOSE_FILE=$(LOCAL_DOCKER_COMPOSE_FILE) ./scripts/revision.sh "$(MSG)"
 
 logs:
 	$(COMPOSE) logs -f
