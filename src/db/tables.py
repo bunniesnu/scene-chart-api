@@ -271,7 +271,7 @@ class SongChartSnapshot(SQLModel, table=True):
     )
     fetched_at: datetime = Field(default_factory=now)
 
-    rank_day: str | None = None      # RANKDAY (chart's own snapshot date)
+    rank_day: date                   # RANKDAY (chart's own snapshot date)
     rank_hour: str | None = None     # RANKHOUR
 
     current_rank: int                # CURRANK
