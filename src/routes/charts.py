@@ -85,7 +85,7 @@ def get_latest_chart(
 def get_chart_history(
     chart_type: ChartType,
     session: Session = Depends(get_session),
-    songs: list[str] = Query(),
+    songId: str = Query(),
 ):
     snapshots = session.exec(
         select(SongChartSnapshot, Song)
@@ -94,7 +94,7 @@ def get_chart_history(
         .where(
             SongArtist.artist_id == ARTIST_ID,
             SongChartSnapshot.chart_type == chart_type,
-            col(SongChartSnapshot.song_id).in_(songs),
+            SongChartSnapshot.song_id == songId,
         )
         .order_by(
             SongChartSnapshot.song_id,
