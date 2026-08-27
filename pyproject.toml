@@ -10,6 +10,7 @@ dependencies = [
     "melon-api-client>=0.2.6",
     "psycopg2-binary>=2.9.12",
     "pydantic>=2.13.4",
+    "python-dateutil>=2.9.0.post0",
     "requests>=2.34.2",
     "sqlmodel>=0.0.39",
     "uvicorn>=0.52.1",

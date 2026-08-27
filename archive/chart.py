@@ -18,7 +18,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
+from dateutil import parser
 from zoneinfo import ZoneInfo
 from pydantic import BaseModel
 from typing import Literal, TypeGuard
@@ -131,7 +132,7 @@ def _archive_song_chart(
     chart_type: ChartType,
     songs: list[ChartSong],
     archive_songs: list[str],
-    rank_day: str | None,
+    rank_day: date | None,
     rank_hour: str | None,
     bypass_and_run: bool = False,
 ) -> None:
@@ -160,7 +161,7 @@ def _archive_song_chart(
                 chart_type=chart_type,
                 fetched_at=fetched_at,
 
-                rank_day=rank_day,
+                rank_day=rank_day if rank_day else fetched_at.astimezone(localtimezone).date(),
                 rank_hour=rank_hour,
 
                 current_rank=song.current_rank,
@@ -193,7 +194,7 @@ def _archive_song_chart(
         send_discord_webhook(
             chart_name="Melon",
             chart_type=chart_type.name,
-            timeinfo=f"{rank_day} {rank_hour}" if rank_day and rank_hour else (rank_day if rank_day else (rank_hour if rank_hour else "")),
+            timeinfo=(f"{rank_day.strftime("%Y-%m-%d")} {rank_hour}" if rank_hour else rank_day.strftime("%Y-%m-%d")) if rank_day else fetched_at.strftime("%Y-%m-%d"),
             updates=updates
         )
 
@@ -218,7 +219,7 @@ def archive_realtime_chart(
         ChartType.REALTIME,
         chart.songs,
         archive_songs,
-        chart.rank_day,
+        parser.parse(chart.rank_day, ignoretz=True).date(),
         chart.rank_hour,
     )
 
@@ -235,7 +236,7 @@ def archive_top100_chart(
         ChartType.TOP100,
         chart.songs,
         archive_songs,
-        chart.rank_day,
+        parser.parse(chart.rank_day, ignoretz=True).date(),
         chart.rank_hour,
     )
 
@@ -292,7 +293,7 @@ def archive_weekly_chart(
         ChartType.WEEKLY,
         chart.songs,
         archive_songs,
-        chart.end_day,
+        parser.parse(chart.end_day, ignoretz=True).date(),
         None,
     )
 
@@ -309,7 +310,7 @@ def archive_hot100_chart(
         ChartType.HOT100,
         chart.songs,
         archive_songs,
-        chart.rank_day,
+        parser.parse(chart.rank_day, ignoretz=True).date(),
         chart.rank_hour,
     )
 
