@@ -1,0 +1,83 @@
+import zoneinfo
+
+from pydantic import BaseModel
+
+localtimezone = zoneinfo.ZoneInfo("Asia/Seoul")
+
+import requests
+from bs4 import BeautifulSoup
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+
+TOP100_URL = "https://xn--o39an51b2re.com/chart/melon/top100/trend/ranking/"
+
+
+class RankData(BaseModel):
+    timestamp: datetime
+    rank: int
+
+def get_top100_rank_data(song_id: str) -> list[RankData]:
+    response = requests.get(
+        f"{TOP100_URL}{song_id}",
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/151.0.0.0 Safari/537.36"
+            )
+        },
+        timeout=10,
+    )
+    response.raise_for_status()
+
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    table = soup.select_one("#trend-table")
+    if table is None:
+        raise ValueError("Could not find #trend-table")
+
+    results: list[RankData] = []
+
+    for row in table.select("tbody tr"):
+        cells = row.select("td")
+
+        if not cells:
+            continue
+
+        date = cells[0].get_text(strip=True)
+
+        if len(date) != 8 or not date.isdigit():
+            continue
+
+        for hour, cell in enumerate(cells[1:25]):
+            value = cell.get_text(strip=True)
+
+            # Empty cell = no chart data
+            if not value:
+                continue
+
+            try:
+                rank = int(value)
+            except ValueError:
+                continue
+
+            timestamp = datetime.strptime(
+                f"{date}{hour:02d}",
+                "%Y%m%d%H",
+            ).replace(tzinfo=ZoneInfo("Asia/Seoul"))
+
+            results.append(
+                RankData(
+                    timestamp=timestamp,
+                    rank=rank
+                )
+            )
+
+    return results
+
+
+if __name__ == "__main__":
+    rank_data = get_top100_rank_data("37928381")
+    for data in rank_data:
+        print(data)
