@@ -13,7 +13,7 @@ else
 	$(error Unknown ENV '$(ENV)'. Use 'production' or 'local')
 endif
 
-.PHONY: build stop run logs revision main
+.PHONY: build stop run logs restore revision main
 
 build:
 	COMPOSE_BAKE=true $(COMPOSE) build
@@ -21,11 +21,41 @@ build:
 stop:
 	$(COMPOSE) down
 
+ifeq ($(ENV),local)
+
+run: build stop
+	$(COMPOSE) up -d db
+	@echo "Waiting for PostgreSQL..."
+	@until $(COMPOSE) exec -T db pg_isready -U user -d db; do \
+		sleep 1; \
+	done
+	@echo "PostgreSQL is ready."
+	$(MAKE) restore
+	$(COMPOSE) up -d app
+
+else
+
 run: build stop
 	$(COMPOSE) up -d
 
+endif
+
 logs:
 	$(COMPOSE) logs -f
+
+restore:
+	@LATEST=$$(find backup -name '*.dump' -type f | sort | tail -n 1); \
+	test -n "$$LATEST" || (echo "No dump file found in backup/" && exit 1); \
+	echo "Restoring $$LATEST..."; \
+	cat "$$LATEST" | $(COMPOSE) exec -T db \
+		pg_restore \
+		-U user \
+		-d db \
+		--no-owner \
+		--no-acl \
+		--clean \
+		--schema=public \
+		--if-exists
 
 revision:
 	@test -n "$(MSG)" || (echo "Usage: make revision MSG='message'" && exit 1)
