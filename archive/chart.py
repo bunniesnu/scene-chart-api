@@ -30,7 +30,7 @@ import hashlib
 
 localtimezone = ZoneInfo("Asia/Seoul")
 
-from melon.models import ChartSong
+from melon.models import ChartSong, SongDetail
 from sqlmodel import Session, select, and_
 from src.utils.log import update_with_change_log
 
@@ -622,9 +622,10 @@ def has_stream_report_changed(
 
 def _archive_stream_report(
     session: Session,
-    song_id: str,
-    new_report: StreamReportInfo,
+    song_detail: SongDetail,
 ):
+    song_id = song_detail.song.song_id
+    new_report = song_detail.stream_report
     fetched_at = datetime.now(timezone.utc)
     today_date = fetched_at.astimezone(localtimezone).date()
 
