@@ -606,18 +606,27 @@ def _archive_graph(
 # ---------------------------------------------------------------------------
 
 
-class StreamReportStatus(enum.Enum):
-    UNCHANGED = "unchanged"
-    CHANGED = "changed"
-    NEW = "new"
+def has_stream_report_changed(
+    previous: SongStreamReport,
+    new_report: StreamReportInfo,
+) -> bool:
+    gender = new_report.gender_percent
+    return (
+        previous.daily_listener_count != new_report.daily_listener_count
+        or previous.total_listen_count != new_report.total_listen_count
+        or previous.total_listener_count != new_report.total_listener_count
+        or previous.male_percent != (gender.male if gender else None)
+        or previous.female_percent != (gender.female if gender else None)
+        or previous.age_percent != new_report.age_percent
+    )
 
-
-def get_stream_report_status(
+def archive_stream_report(
     session: Session,
     song_id: str,
     new_report: StreamReportInfo,
-) -> StreamReportStatus:
-    today_date = datetime.now(timezone.utc).astimezone(localtimezone).date()
+):
+    fetched_at = datetime.now(timezone.utc)
+    today_date = fetched_at.astimezone(localtimezone).date()
 
     previous = session.exec(
         select(SongStreamReport)
@@ -628,14 +637,43 @@ def get_stream_report_status(
     ).one_or_none()
 
     if previous is None:
-        return StreamReportStatus.NEW
+        gender = new_report.gender_percent
+        new = SongStreamReport(
+            song_id=song_id,
 
-    gender = new_report.gender_percent
-    return StreamReportStatus.CHANGED if (
-        previous.daily_listener_count != new_report.daily_listener_count
-        or previous.total_listen_count != new_report.total_listen_count
-        or previous.total_listener_count != new_report.total_listener_count
-        or previous.male_percent != (gender.male if gender else None)
-        or previous.female_percent != (gender.female if gender else None)
-        or previous.age_percent != new_report.age_percent
-    ) else StreamReportStatus.UNCHANGED
+            fetched_at=fetched_at,
+            updated_at=fetched_at,
+
+            report_date=today_date,
+
+            daily_listener_count=new_report.daily_listener_count,
+            total_listen_count=new_report.total_listen_count,
+            total_listener_count=new_report.total_listener_count,
+
+            male_percent=gender.male if gender else None,
+            female_percent=gender.female if gender else None,
+            age_percent=new_report.age_percent,
+        )
+        session.add(new)
+        logger.info(
+            "[stream-report] %s new report archived at %s",
+            song_id,
+            today_date,
+        )
+    elif has_stream_report_changed(previous, new_report):
+        gender = new_report.gender_percent
+
+        previous.updated_at = fetched_at
+        previous.daily_listener_count = new_report.daily_listener_count
+        previous.total_listen_count = new_report.total_listen_count
+        previous.total_listener_count = new_report.total_listener_count
+        previous.male_percent = gender.male if gender else None
+        previous.female_percent = gender.female if gender else None
+        previous.age_percent = new_report.age_percent
+
+        session.add(previous)
+        logger.info(
+            "[stream-report] %s report updated at %s",
+            song_id,
+            today_date,
+        )
