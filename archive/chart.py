@@ -654,6 +654,8 @@ def _archive_stream_report(
             male_percent=gender.male if gender else None,
             female_percent=gender.female if gender else None,
             age_percent=new_report.age_percent,
+
+            yesterday_rank=song_detail.achievement.yesterday_chart_rank if song_detail.achievement else None
         )
         session.add(new)
         logger.info(

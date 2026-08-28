@@ -495,6 +495,8 @@ class SongStreamReport(SQLModel, table=True):
     male_percent: int | None = None
     female_percent: int | None = None
 
+    yesterday_rank: int | None = None
+
     age_percent: list[int] | None = Field(
         default=None,
         sa_column=Column(ARRAY(INTEGER))
