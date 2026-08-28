@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 def archive_log(func: Callable[P, R]) -> Callable[P, R]:
     @wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        log_dir = Path("/app/logs/archive")
+        log_dir = Path("./extract/log/")
         log_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now(timezone.utc).strftime(

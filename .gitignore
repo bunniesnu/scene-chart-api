@@ -15,3 +15,4 @@ wheels/
 data/
 send*
 backup/
+extract/log/
