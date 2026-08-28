@@ -620,7 +620,7 @@ def has_stream_report_changed(
         or previous.age_percent != new_report.age_percent
     )
 
-def archive_stream_report(
+def _archive_stream_report(
     session: Session,
     song_id: str,
     new_report: StreamReportInfo,
