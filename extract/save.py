@@ -127,4 +127,5 @@ def main(chart_type: ChartType, commit: bool = False):
 
 
 if __name__ == "__main__":
-    main(ChartType.REALTIME, False)
+    main(ChartType.TOP100, True)
+    main(ChartType.REALTIME, True)
