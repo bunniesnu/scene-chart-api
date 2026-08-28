@@ -44,9 +44,28 @@ def main(chart_type: ChartType, commit: bool = False):
                         )
                     ).first()
 
-                    past_rank = rank if timestamp.hour in [1, 8] else data[i - 1].rank if i > 0 and (timestamp - data[i - 1].timestamp).total_seconds() == 3600 else 0
-                    rank_gap = abs(rank - past_rank) if past_rank != 0 else 0
-                    rank_type = "NONE" if timestamp.hour in [1, 8] else "NEW" if past_rank == 0 else "UP" if rank < past_rank else "DOWN" if rank > past_rank else "NONE"
+                    if timestamp.hour in [1,8]:
+                        past_rank = rank
+                    elif i > 0 and (timestamp - data[i - 1].timestamp).total_seconds() == 3600:
+                        past_rank = data[i - 1].rank
+                    else:
+                        past_rank = 0
+
+                    if past_rank != 0:
+                        rank_gap = abs(rank - past_rank)
+                    else:
+                        rank_gap = 0
+
+                    if timestamp.hour in [1, 8]:
+                        rank_type = "NONE"
+                    elif past_rank == 0:
+                        rank_type = "NEW"
+                    elif rank < past_rank:
+                        rank_type = "UP"
+                    elif rank > past_rank:
+                        rank_type = "DOWN"
+                    else:
+                        rank_type = "NONE"
 
                     if existing_record:
                         if existing_record.current_rank != rank or existing_record.past_rank != past_rank or existing_record.rank_gap != rank_gap or existing_record.rank_type != rank_type:
