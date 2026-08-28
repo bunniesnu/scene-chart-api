@@ -13,6 +13,8 @@ Stores:
 All chart tables are append-only snapshots.
 """
 
+import enum
+
 from src.utils.logger import archive_log
 import logging
 
@@ -43,11 +45,13 @@ from src.db.tables import (
     ChartReportSnapshot,
     RankHistoryPoint,
     GraphPoint,
+    SongStreamReport,
 )
 from melon.chart import (
     FiveGraph,
     ChartGraph,
 )
+from melon.models.song import StreamReportInfo
 
 from src.utils.webhook import send_discord_webhook, ChartUpdate
 
@@ -595,3 +599,43 @@ def _archive_graph(
         resolution.value,
         count,
     )
+
+
+# ---------------------------------------------------------------------------
+# Song stream report
+# ---------------------------------------------------------------------------
+
+
+class StreamReportStatus(enum.Enum):
+    UNCHANGED = "unchanged"
+    CHANGED = "changed"
+    NEW = "new"
+
+
+def get_stream_report_status(
+    session: Session,
+    song_id: str,
+    new_report: StreamReportInfo,
+) -> StreamReportStatus:
+    today_date = datetime.now(timezone.utc).astimezone(localtimezone).date()
+
+    previous = session.exec(
+        select(SongStreamReport)
+        .where(
+            SongStreamReport.song_id == song_id,
+            SongStreamReport.report_date == today_date
+        )
+    ).one_or_none()
+
+    if previous is None:
+        return StreamReportStatus.NEW
+
+    gender = new_report.gender_percent
+    return StreamReportStatus.CHANGED if (
+        previous.daily_listener_count != new_report.daily_listener_count
+        or previous.total_listen_count != new_report.total_listen_count
+        or previous.total_listener_count != new_report.total_listener_count
+        or previous.male_percent != (gender.male if gender else None)
+        or previous.female_percent != (gender.female if gender else None)
+        or previous.age_percent != new_report.age_percent
+    ) else StreamReportStatus.UNCHANGED
