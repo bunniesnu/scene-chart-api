@@ -19,7 +19,7 @@ from enum import Enum
 import uuid
 
 from sqlalchemy import Column, Index, Enum as SAEnum, UUID as SAUUID
-from sqlmodel import SQLModel, Field, Relationship, UniqueConstraint
+from sqlmodel import ARRAY, INTEGER, SQLModel, Field, Relationship, UniqueConstraint
 from sqlalchemy.sql.functions import now
 
 
@@ -463,3 +463,39 @@ class ArchiveChangeLog(SQLModel, table=True):
     new_value: str | None
 
     changed_at: datetime = Field(default_factory=now)
+
+
+class SongStreamReport(SQLModel, table=True):
+    """Time series of a song's streaming report"""
+
+    __table_args__ = (
+        UniqueConstraint(
+            "song_id",
+            "report_date",
+            name="uq_song_stream_report_song_date",
+        ),
+    )
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=SAUUID
+    )
+    song_id: str = Field(foreign_key="song.song_id")
+
+    fetched_at: datetime = Field(default_factory=now)
+    updated_at: datetime = Field(default_factory=now)
+
+    report_date: date
+
+    daily_listener_count: int | None = None
+    total_listen_count: int | None = None
+    total_listener_count: int | None = None
+
+    male_percent: int | None = None
+    female_percent: int | None = None
+
+    age_percent: list[int] | None = Field(
+        default=None,
+        sa_column=Column(ARRAY(INTEGER))
+    )

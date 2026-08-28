@@ -16,14 +16,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker compose -f $LOCAL_DOCKER_COMPOSE_FILE down
+docker compose -f $LOCAL_DOCKER_COMPOSE_FILE --project-directory . -p $LOCAL_PROJECT_NAME down
 docker volume rm ${LOCAL_PROJECT_NAME}_db_data || true
-docker compose -f $LOCAL_DOCKER_COMPOSE_FILE up -d --build db
+docker compose -f $LOCAL_DOCKER_COMPOSE_FILE --project-directory . -p $LOCAL_PROJECT_NAME up -d --build db
 
 DATABASE_URL=postgresql://user:password@localhost:5432/db
 
 # Wait for db to be ready
-until docker compose -f $LOCAL_DOCKER_COMPOSE_FILE exec db pg_isready -U user -d db; do
+until docker compose -f $LOCAL_DOCKER_COMPOSE_FILE --project-directory . -p $LOCAL_PROJECT_NAME exec db pg_isready -U user -d db; do
   sleep 1
 done
 
