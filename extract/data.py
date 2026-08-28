@@ -2,6 +2,8 @@ import zoneinfo
 
 from pydantic import BaseModel
 
+from src.db.tables import ChartType
+
 localtimezone = zoneinfo.ZoneInfo("Asia/Seoul")
 
 import requests
@@ -11,15 +13,24 @@ from zoneinfo import ZoneInfo
 
 
 TOP100_URL = "https://xn--o39an51b2re.com/chart/melon/top100/trend/ranking/"
+REALTIME_URL = "https://xn--o39an51b2re.com/chart/melon/realtime/trend/ranking/"
+
+def get_url(chart_type: ChartType, song_id: str) -> str:
+    if chart_type == ChartType.TOP100:
+        return f"{TOP100_URL}{song_id}"
+    elif chart_type == ChartType.REALTIME:
+        return f"{REALTIME_URL}{song_id}"
+    else:
+        raise ValueError(f"Unsupported chart type: {chart_type}")
 
 
 class RankData(BaseModel):
     timestamp: datetime
     rank: int
 
-def get_top100_rank_data(song_id: str) -> list[RankData]:
+def get_rank_data(chart_type: ChartType, song_id: str) -> list[RankData]:
     response = requests.get(
-        f"{TOP100_URL}{song_id}",
+        get_url(chart_type, song_id),
         headers={
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -78,6 +89,6 @@ def get_top100_rank_data(song_id: str) -> list[RankData]:
 
 
 if __name__ == "__main__":
-    rank_data = get_top100_rank_data("37928381")
+    rank_data = get_rank_data(ChartType.TOP100, "37928381")
     for data in rank_data:
         print(data)

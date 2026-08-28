@@ -7,7 +7,7 @@ from sqlmodel import Session, and_, select
 
 from src.db.tables import ChartType, Song, SongArtist, SongChartSnapshot
 
-from extract.data import get_top100_rank_data
+from extract.data import get_rank_data
 from src.utils.logger import archive_log
 
 from src.db.db import engine
@@ -16,7 +16,7 @@ from src.const import ARTIST_ID
 
 
 @archive_log
-def top100_main():
+def main(chart_type: ChartType, commit: bool = False):
     try:
         with Session(engine) as session:
             archive_songs = list(session.exec(
@@ -25,7 +25,7 @@ def top100_main():
                 .where(SongArtist.artist_id == ARTIST_ID)
             ).all())
             for song_id in archive_songs:
-                data = get_top100_rank_data(song_id)
+                data = get_rank_data(chart_type, song_id)
                 print(f"Total: {len(data)}")
                 for i, point in enumerate(data):
                     timestamp = point.timestamp
@@ -37,7 +37,7 @@ def top100_main():
                         .where(
                             and_(
                                 SongChartSnapshot.song_id == song_id,
-                                SongChartSnapshot.chart_type == ChartType.TOP100,
+                                SongChartSnapshot.chart_type == chart_type,
                                 SongChartSnapshot.rank_day == timestamp.date(),
                                 SongChartSnapshot.rank_hour == f"{timestamp.hour:0>2}:00",
                             )
@@ -59,7 +59,7 @@ def top100_main():
 
                     # Create a new record
                     new_record = SongChartSnapshot(
-                        chart_type=ChartType.TOP100,
+                        chart_type=chart_type,
                         current_rank=rank,
                         rank_day=timestamp.date(),
                         rank_hour=f"{timestamp.hour:0>2}:00",
@@ -73,11 +73,13 @@ def top100_main():
                     logger.info(
                         "[chart] %s %s %s",
                         timestamp.strftime("%Y-%m-%d %H:%M"),
-                        ChartType.TOP100,
+                        chart_type.value,
                         rank
                     )
 
-                session.commit()
+                if commit:
+                    session.commit()
+                    logger.info("[chart] Committed changes for song_id: %s", song_id)
     except Exception as e:
         error = traceback.format_exc()
         print(error)
@@ -85,4 +87,4 @@ def top100_main():
 
 
 if __name__ == "__main__":
-    top100_main()
+    main(ChartType.REALTIME, False)
