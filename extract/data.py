@@ -101,12 +101,12 @@ class DailyRankData(BaseModel):
     male_percent: float | None
     female_percent: float | None
 
-    age_10s_percent: int | None
-    age_20s_percent: int | None
-    age_30s_percent: int | None
-    age_40s_percent: int | None
-    age_50s_percent: int | None
-    age_60s_percent: int | None
+    age_10s_percent: int
+    age_20s_percent: int
+    age_30s_percent: int
+    age_40s_percent: int
+    age_50s_percent: int
+    age_60s_percent: int
 
 def parse_int(value: str) -> int | None:
     value = value.strip()
@@ -124,11 +124,11 @@ def parse_percent(value: str) -> float | None:
 
     return float(value.rstrip("%"))
 
-def parse_int_percent(value: str) -> int | None:
+def parse_age_percent(value: str) -> int:
     value = value.strip()
 
     if value == "-":
-        return None
+        return 0
 
     value = value.rstrip("%")
 
@@ -185,12 +185,12 @@ def get_daily_rank_data(song_id: str) -> list[DailyRankData]:
                 listener_change=parse_int(cells[3].get_text(strip=True)),
                 male_percent=parse_percent(cells[4].get_text(strip=True)),
                 female_percent=parse_percent(cells[5].get_text(strip=True)),
-                age_10s_percent=parse_int_percent(cells[6].get_text(strip=True)),
-                age_20s_percent=parse_int_percent(cells[7].get_text(strip=True)),
-                age_30s_percent=parse_int_percent(cells[8].get_text(strip=True)),
-                age_40s_percent=parse_int_percent(cells[9].get_text(strip=True)),
-                age_50s_percent=parse_int_percent(cells[10].get_text(strip=True)),
-                age_60s_percent=parse_int_percent(cells[11].get_text(strip=True)),
+                age_10s_percent=parse_age_percent(cells[6].get_text(strip=True)),
+                age_20s_percent=parse_age_percent(cells[7].get_text(strip=True)),
+                age_30s_percent=parse_age_percent(cells[8].get_text(strip=True)),
+                age_40s_percent=parse_age_percent(cells[9].get_text(strip=True)),
+                age_50s_percent=parse_age_percent(cells[10].get_text(strip=True)),
+                age_60s_percent=parse_age_percent(cells[11].get_text(strip=True)),
             )
         )
 

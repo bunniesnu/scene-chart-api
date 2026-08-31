@@ -35,13 +35,20 @@ def process_daily(song_id: str, session: Session):
                 existing_record.daily_listener_count != point.listener_count
                 or existing_record.male_percent != point.male_percent
                 or existing_record.female_percent != point.female_percent
-                or existing_record.age_percent is None
-                or existing_record.age_percent[0] != point.age_10s_percent
-                or existing_record.age_percent[1] != point.age_20s_percent
-                or existing_record.age_percent[2] != point.age_30s_percent
-                or existing_record.age_percent[3] != point.age_40s_percent
-                or existing_record.age_percent[4] != point.age_50s_percent
-                or existing_record.age_percent[5] != point.age_60s_percent
+                or (
+                    existing_record.age_percent is None
+                    and sum([point.age_10s_percent, point.age_20s_percent, point.age_30s_percent, point.age_40s_percent, point.age_50s_percent, point.age_60s_percent]) != 0
+                )
+                or (
+                    existing_record.age_percent is not None and (
+                        existing_record.age_percent[0] != point.age_10s_percent
+                        or existing_record.age_percent[1] != point.age_20s_percent
+                        or existing_record.age_percent[2] != point.age_30s_percent
+                        or existing_record.age_percent[3] != point.age_40s_percent
+                        or existing_record.age_percent[4] != point.age_50s_percent
+                        or existing_record.age_percent[5] != point.age_60s_percent
+                    )
+                )
             ):
                 logger.warning(
                     f"Record {point.report_date.strftime('%Y-%m-%d')} differ value: existing: {existing_record.daily_listener_count}, {existing_record.male_percent}, {existing_record.female_percent}, {existing_record.age_percent} | new: {point.listener_count}, {point.male_percent}, {point.female_percent}, {[point.age_10s_percent, point.age_20s_percent, point.age_30s_percent, point.age_40s_percent, point.age_50s_percent, point.age_60s_percent]}."
@@ -53,12 +60,14 @@ def process_daily(song_id: str, session: Session):
         if (
             point.male_percent is None
             or point.female_percent is None
-            or point.age_10s_percent is None
-            or point.age_20s_percent is None
-            or point.age_30s_percent is None
-            or point.age_40s_percent is None
-            or point.age_50s_percent is None
-            or point.age_60s_percent is None
+            or sum([
+                point.age_10s_percent,
+                point.age_20s_percent,
+                point.age_30s_percent,
+                point.age_40s_percent,
+                point.age_50s_percent,
+                point.age_60s_percent,
+            ]) != 100
         ):
             logger.warning(f"Record {point.report_date.strftime('%Y-%m-%d')} has missing percent data. Still saving the record. {song_id} | {point.listener_count}, {point.male_percent}, {point.female_percent}, {[point.age_10s_percent, point.age_20s_percent, point.age_30s_percent, point.age_40s_percent, point.age_50s_percent, point.age_60s_percent]}")
 
@@ -76,7 +85,14 @@ def process_daily(song_id: str, session: Session):
                 point.age_40s_percent,
                 point.age_50s_percent,
                 point.age_60s_percent,
-            ] if point.age_10s_percent is not None and point.age_20s_percent is not None and point.age_30s_percent is not None and point.age_40s_percent is not None and point.age_50s_percent is not None and point.age_60s_percent is not None else None,
+            ] if sum([
+                point.age_10s_percent,
+                point.age_20s_percent,
+                point.age_30s_percent,
+                point.age_40s_percent,
+                point.age_50s_percent,
+                point.age_60s_percent,
+            ]) != 0 else None
         )
         session.add(new_record)
 
