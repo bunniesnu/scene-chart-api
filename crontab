@@ -2,3 +2,4 @@
 1 1 * * * cd /app && uv run python -m jobs.archive_charts
 1-59/5 0,7-23 * * * cd /app && uv run python -m jobs.archive_charts
 5 2-6 * * * cd /app && uv run python -m jobs.archive_top100
+0 18 * * * cd /app && uv run python -m jobs.archive_stream_reports

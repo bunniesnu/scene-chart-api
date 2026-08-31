@@ -13,6 +13,8 @@ Stores:
 All chart tables are append-only snapshots.
 """
 
+import enum
+
 from src.utils.logger import archive_log
 import logging
 
@@ -28,7 +30,7 @@ import hashlib
 
 localtimezone = ZoneInfo("Asia/Seoul")
 
-from melon.models import ChartSong
+from melon.models import ChartSong, SongDetail
 from sqlmodel import Session, select, and_
 from src.utils.log import update_with_change_log
 
@@ -43,11 +45,13 @@ from src.db.tables import (
     ChartReportSnapshot,
     RankHistoryPoint,
     GraphPoint,
+    SongStreamReport,
 )
 from melon.chart import (
     FiveGraph,
     ChartGraph,
 )
+from melon.models.song import StreamReportInfo
 
 from src.utils.webhook import send_discord_webhook, ChartUpdate
 
@@ -594,4 +598,82 @@ def _archive_graph(
         "[graph] %s +%s",
         resolution.value,
         count,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Song stream report
+# ---------------------------------------------------------------------------
+
+
+@archive_log
+def archive_stream_reports(
+    session: Session,
+    client: MelonClient,
+    artist_id: str,
+) -> None:
+    """
+    Fetch and archive song reports.
+    """
+
+    logger.info("[stream-report] archive start")
+
+    archive_songs = session.exec(
+        select(Song.song_id)
+        .join(SongArtist, and_(SongArtist.song_id == Song.song_id))
+        .where(SongArtist.artist_id == artist_id)
+    ).all()
+
+    logger.info("[stream-report] %s songs to archive", len(archive_songs))
+
+    for song in archive_songs:
+        song_detail = client.get_song_detail(song)
+        if song_detail is None:
+            logger.warning("[stream-report] %s detail not found", song)
+            continue
+
+        _archive_stream_report(session, song_detail)
+
+    try:
+        session.commit()
+    except Exception:
+        logger.exception("[stream-report] archive failed")
+        session.rollback()
+        raise
+
+    logger.info("[stream-report] archive complete")
+
+def _archive_stream_report(
+    session: Session,
+    song_detail: SongDetail,
+):
+    song_id = song_detail.song.song_id
+    new_report = song_detail.stream_report
+    fetched_at = datetime.now(timezone.utc)
+    today_date = fetched_at.astimezone(localtimezone).date()
+
+    gender = new_report.gender_percent
+    new = SongStreamReport(
+        song_id=song_id,
+
+        fetched_at=fetched_at,
+        updated_at=fetched_at,
+
+        report_date=today_date,
+
+        daily_listener_count=new_report.daily_listener_count,
+        total_listen_count=new_report.total_listen_count,
+        total_listener_count=new_report.total_listener_count,
+
+        male_percent=gender.male if gender else None,
+        female_percent=gender.female if gender else None,
+        age_percent=new_report.age_percent,
+
+        yesterday_rank=song_detail.achievement.yesterday_chart_rank if song_detail.achievement else None
+    )
+    session.add(new)
+    logger.info(
+        "[stream-report] %s archived at %s",
+        song_id,
+        today_date,
     )
