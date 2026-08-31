@@ -16,3 +16,4 @@ data/
 send*
 backup/
 extract/log/
+temp/
