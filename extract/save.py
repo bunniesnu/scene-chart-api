@@ -67,7 +67,7 @@ def process_daily(song_id: str, session: Session):
                 point.age_40s_percent,
                 point.age_50s_percent,
                 point.age_60s_percent,
-            ]) != 100
+            ]) == 0
         ):
             logger.warning(f"Record {point.report_date.strftime('%Y-%m-%d')} has missing percent data. Still saving the record. {song_id} | {point.listener_count}, {point.male_percent}, {point.female_percent}, {[point.age_10s_percent, point.age_20s_percent, point.age_30s_percent, point.age_40s_percent, point.age_50s_percent, point.age_60s_percent]}")
 
@@ -242,6 +242,7 @@ def main(chart_type: ChartType, commit: bool = False):
 
 
 if __name__ == "__main__":
-    main(ChartType.TOP100, True)
-    main(ChartType.REALTIME, True)
-    main(ChartType.HOT100, True)
+    # main(ChartType.TOP100, True)
+    # main(ChartType.REALTIME, True)
+    # main(ChartType.HOT100, True)
+    main(ChartType.DAILY, False)
