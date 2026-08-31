@@ -61,7 +61,5 @@ revision:
 	@test -n "$(MSG)" || (echo "Usage: make revision MSG='message'" && exit 1)
 	LOCAL_PROJECT_NAME=$(LOCAL_PROJECT_NAME) LOCAL_DOCKER_COMPOSE_FILE=$(LOCAL_DOCKER_COMPOSE_FILE) ./scripts/revision.sh "$(MSG)"
 
-main: build stop
-	$(COMPOSE) up -d app
+main:
 	$(COMPOSE) exec app uv run --no-sync main.py
-	$(COMPOSE) down
