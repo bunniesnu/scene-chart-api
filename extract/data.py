@@ -1,15 +1,13 @@
-import zoneinfo
-
+from zoneinfo import ZoneInfo
 from pydantic import BaseModel
 
 from src.db.tables import ChartType
 
-localtimezone = zoneinfo.ZoneInfo("Asia/Seoul")
+localtimezone = ZoneInfo("Asia/Seoul")
 
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 
 TOP100_URL = "https://xn--o39an51b2re.com/chart/melon/top100/trend/ranking/"
