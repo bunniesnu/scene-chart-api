@@ -7,7 +7,7 @@ localtimezone = ZoneInfo("Asia/Seoul")
 
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, date
 
 
 TOP100_URL = "https://xn--o39an51b2re.com/chart/melon/top100/trend/ranking/"
@@ -93,7 +93,7 @@ def get_rank_data(chart_type: ChartType, song_id: str) -> list[RankData]:
 # Daily rank data extraction
 
 class DailyRankData(BaseModel):
-    timestamp: datetime
+    report_date: date
     rank: int | None
     listener_count: int | None
     listener_change: int | None
@@ -157,14 +157,14 @@ def get_daily_rank_data(song_id: str) -> list[DailyRankData]:
         if len(date) != 8 or not date.isdigit():
             continue
 
-        timestamp = datetime.strptime(
+        report_date = datetime.strptime(
             date,
             "%Y%m%d",
-        ).replace(tzinfo=localtimezone)
+        ).replace(tzinfo=localtimezone).date()
 
         results.append(
             DailyRankData(
-                timestamp=timestamp,
+                report_date=report_date,
                 rank=parse_int(cells[1].get_text(strip=True)),
                 listener_count=parse_int(cells[2].get_text(strip=True)),
                 listener_change=parse_int(cells[3].get_text(strip=True)),
