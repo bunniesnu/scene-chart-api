@@ -624,6 +624,8 @@ def archive_stream_reports(
         .where(SongArtist.artist_id == artist_id)
     ).all()
 
+    logger.info("[stream-report] %s songs to archive", len(archive_songs))
+
     for song in archive_songs:
         song_detail = client.get_song_detail(song)
         if song_detail is None:
