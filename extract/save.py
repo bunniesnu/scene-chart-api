@@ -1,3 +1,4 @@
+from decimal import Decimal
 import logging
 import traceback
 
@@ -5,14 +6,86 @@ logger = logging.getLogger(__name__)
 
 from sqlmodel import Session, and_, select
 
-from src.db.tables import ChartType, Song, SongArtist, SongChartSnapshot
+from src.db.tables import ChartType, Song, SongArtist, SongChartSnapshot, SongStreamReport
 
-from extract.data import get_rank_data
+from extract.data import get_daily_rank_data, get_rank_data
 from src.utils.logger import archive_log
 
 from src.db.db import engine
 
 from src.const import ARTIST_ID
+
+
+def process_daily(song_id: str, session: Session):
+    data = get_daily_rank_data(song_id)
+    for point in data:
+        # Check if the record already exists
+        existing_record = session.exec(
+            select(SongStreamReport)
+            .where(
+                and_(
+                    SongStreamReport.song_id == song_id,
+                    SongStreamReport.report_date == point.report_date,
+                )
+            )
+        ).first()
+
+        if existing_record:
+            if (
+                existing_record.daily_listener_count != point.listener_count
+                or existing_record.male_percent != point.male_percent
+                or existing_record.female_percent != point.female_percent
+                or existing_record.age_percent is None
+                or existing_record.age_percent[0] != point.age_10s_percent
+                or existing_record.age_percent[1] != point.age_20s_percent
+                or existing_record.age_percent[2] != point.age_30s_percent
+                or existing_record.age_percent[3] != point.age_40s_percent
+                or existing_record.age_percent[4] != point.age_50s_percent
+                or existing_record.age_percent[5] != point.age_60s_percent
+            ):
+                logger.warning(
+                    f"Record {point.report_date.strftime('%Y-%m-%d')} differ value: existing: {existing_record.daily_listener_count}, {existing_record.male_percent}, {existing_record.female_percent}, {existing_record.age_percent} | new: {point.listener_count}, {point.male_percent}, {point.female_percent}, {[point.age_10s_percent, point.age_20s_percent, point.age_30s_percent, point.age_40s_percent, point.age_50s_percent, point.age_60s_percent]}."
+                )
+            else:
+                logger.info(f"Record already exists for {point.report_date}, skipping.")
+            continue
+
+        if (
+            point.male_percent is None
+            or point.female_percent is None
+            or point.age_10s_percent is None
+            or point.age_20s_percent is None
+            or point.age_30s_percent is None
+            or point.age_40s_percent is None
+            or point.age_50s_percent is None
+            or point.age_60s_percent is None
+        ):
+            logger.warning(f"Record {point.report_date.strftime('%Y-%m-%d')} has missing percent data. Still saving the record. {song_id} | {point.listener_count}, {point.male_percent}, {point.female_percent}, {[point.age_10s_percent, point.age_20s_percent, point.age_30s_percent, point.age_40s_percent, point.age_50s_percent, point.age_60s_percent]}")
+
+        # Create a new record
+        new_record = SongStreamReport(
+            song_id=song_id,
+            report_date=point.report_date,
+            daily_listener_count=point.listener_count,
+            male_percent=Decimal(point.male_percent) if point.male_percent else None,
+            female_percent=Decimal(point.female_percent) if point.female_percent else None,
+            age_percent=[
+                point.age_10s_percent,
+                point.age_20s_percent,
+                point.age_30s_percent,
+                point.age_40s_percent,
+                point.age_50s_percent,
+                point.age_60s_percent,
+            ] if point.age_10s_percent is not None and point.age_20s_percent is not None and point.age_30s_percent is not None and point.age_40s_percent is not None and point.age_50s_percent is not None and point.age_60s_percent is not None else None,
+        )
+        session.add(new_record)
+
+        logger.info(
+            "[chart] %s %s %s",
+            point.report_date.strftime("%Y-%m-%d"),
+            ChartType.DAILY.value,
+            song_id
+        )
 
 
 @archive_log
@@ -25,6 +98,9 @@ def main(chart_type: ChartType, commit: bool = False):
                 .where(SongArtist.artist_id == ARTIST_ID)
             ).all())
             for song_id in archive_songs:
+                if chart_type == ChartType.DAILY:
+                    process_daily(song_id, session)
+                    continue
                 data = get_rank_data(chart_type, song_id)
                 print(f"Total: {len(data)}")
                 for i, point in enumerate(data):
