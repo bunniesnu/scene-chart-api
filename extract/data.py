@@ -14,12 +14,15 @@ from zoneinfo import ZoneInfo
 
 TOP100_URL = "https://xn--o39an51b2re.com/chart/melon/top100/trend/ranking/"
 REALTIME_URL = "https://xn--o39an51b2re.com/chart/melon/realtime/trend/ranking/"
+HOT100_URL = "https://xn--o39an51b2re.com/chart/melon/hot100-d100/trend/ranking/"
 
 def get_url(chart_type: ChartType, song_id: str) -> str:
     if chart_type == ChartType.TOP100:
         return f"{TOP100_URL}{song_id}"
     elif chart_type == ChartType.REALTIME:
         return f"{REALTIME_URL}{song_id}"
+    elif chart_type == ChartType.HOT100:
+        return f"{HOT100_URL}{song_id}"
     else:
         raise ValueError(f"Unsupported chart type: {chart_type}")
 

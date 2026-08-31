@@ -85,6 +85,29 @@ def main(chart_type: ChartType, commit: bool = False):
                             rank_type = "DOWN"
                         else:
                             rank_type = "NONE"
+                    elif chart_type == ChartType.HOT100:
+                        if i == 0:
+                            past_rank = 0
+                        elif timestamp.hour == 7 and data[i - 1].timestamp.hour == 1:
+                            past_rank = data[i - 1].rank
+                        elif (timestamp - data[i - 1].timestamp).total_seconds() == 3600:
+                            past_rank = data[i - 1].rank
+                        else:
+                            past_rank = 0
+
+                        if past_rank != 0:
+                            rank_gap = abs(rank - past_rank)
+                        else:
+                            rank_gap = 0
+
+                        if past_rank == 0:
+                            rank_type = "NEW"
+                        elif rank < past_rank:
+                            rank_type = "UP"
+                        elif rank > past_rank:
+                            rank_type = "DOWN"
+                        else:
+                            rank_type = "NONE"
                     else:
                         raise ValueError(f"Unsupported chart type: {chart_type}")
 
@@ -129,3 +152,4 @@ def main(chart_type: ChartType, commit: bool = False):
 if __name__ == "__main__":
     main(ChartType.TOP100, True)
     main(ChartType.REALTIME, True)
+    main(ChartType.HOT100, True)
