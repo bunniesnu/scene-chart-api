@@ -54,3 +54,4 @@ def run_archive_stream_reports():
 if __name__ == "__main__":
     run_archive_artist()
     run_archive_charts()
+    run_archive_stream_reports()
