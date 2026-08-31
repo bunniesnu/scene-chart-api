@@ -606,7 +606,42 @@ def _archive_graph(
 # ---------------------------------------------------------------------------
 
 
-def archive_stream_report(
+@archive_log
+def archive_stream_reports(
+    session: Session,
+    client: MelonClient,
+    artist_id: str,
+) -> None:
+    """
+    Fetch and archive song reports.
+    """
+
+    logger.info("[stream-report] archive start")
+
+    archive_songs = session.exec(
+        select(Song.song_id)
+        .join(SongArtist, and_(SongArtist.song_id == Song.song_id))
+        .where(SongArtist.artist_id == artist_id)
+    ).all()
+
+    for song in archive_songs:
+        song_detail = client.get_song_detail(song)
+        if song_detail is None:
+            logger.warning("[stream-report] %s detail not found", song)
+            continue
+
+        _archive_stream_report(session, song_detail)
+
+    try:
+        session.commit()
+    except Exception:
+        logger.exception("[stream-report] archive failed")
+        session.rollback()
+        raise
+
+    logger.info("[stream-report] archive complete")
+
+def _archive_stream_report(
     session: Session,
     song_detail: SongDetail,
 ):
