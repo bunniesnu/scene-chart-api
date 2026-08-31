@@ -13,7 +13,7 @@ Stores:
 All chart tables are append-only snapshots.
 """
 
-import enum
+from decimal import Decimal
 
 from src.utils.logger import archive_log
 import logging
@@ -665,8 +665,8 @@ def _archive_stream_report(
         total_listen_count=new_report.total_listen_count,
         total_listener_count=new_report.total_listener_count,
 
-        male_percent=gender.male if gender else None,
-        female_percent=gender.female if gender else None,
+        male_percent=Decimal(gender.male) if gender else None,
+        female_percent=Decimal(gender.female) if gender else None,
         age_percent=new_report.age_percent,
 
         yesterday_rank=song_detail.achievement.yesterday_chart_rank if song_detail.achievement else None

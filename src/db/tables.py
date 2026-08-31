@@ -15,6 +15,7 @@ Design notes
 """
 
 from datetime import datetime, date
+from decimal import Decimal
 from enum import Enum
 import uuid
 
@@ -492,8 +493,8 @@ class SongStreamReport(SQLModel, table=True):
     total_listen_count: int | None = None
     total_listener_count: int | None = None
 
-    male_percent: int | None = None
-    female_percent: int | None = None
+    male_percent: Decimal | None = Field(default=None, max_digits=4, decimal_places=1)
+    female_percent: Decimal | None = Field(default=None, max_digits=4, decimal_places=1)
 
     yesterday_rank: int | None = None
 
