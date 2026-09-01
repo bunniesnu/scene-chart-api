@@ -192,7 +192,10 @@ def process_weekly(song_id: str, session: Session):
                 logger.warning(f"[weekly] [chart] First record for {point.report_date.strftime('%Y-%m-%d')} is not the first week of the year. Skipping. {song_id}")
                 continue
             past_rank = data[i - 1].rank
-            rank_gap = abs(point.rank - past_rank)
+            if past_rank > 100:
+                rank_gap = 0
+            else:
+                rank_gap = abs(point.rank - past_rank)
             if past_rank > 100:
                 rank_type = "NEW"
             elif point.rank < past_rank:
