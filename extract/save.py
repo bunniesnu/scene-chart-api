@@ -8,7 +8,7 @@ from sqlmodel import Session, and_, select
 
 from src.db.tables import ChartType, Song, SongArtist, SongChartSnapshot, SongStreamReport
 
-from extract.data import get_daily_rank_data, get_rank_data
+from extract.data import get_daily_rank_data, get_rank_data, get_weekly_rank_data
 from src.utils.logger import archive_log
 
 from src.db.db import engine
@@ -164,6 +164,77 @@ def process_daily(song_id: str, session: Session):
         )
 
 
+def process_weekly(song_id: str, session: Session):
+    data = get_weekly_rank_data(song_id)
+    for i, point in enumerate(data):
+        # Check if the record already exists
+        existing_record = session.exec(
+            select(SongChartSnapshot)
+            .where(
+                and_(
+                    SongChartSnapshot.song_id == song_id,
+                    SongChartSnapshot.chart_type == ChartType.WEEKLY,
+                    SongChartSnapshot.rank_day == point.report_date,
+                )
+            )
+        ).first()
+
+        if point.rank > 100:
+            logger.info(f"[weekly] [chart] Record {point.report_date.strftime('%Y-%m-%d')} has rank {point.rank}, which is greater than 100. Skipping. {song_id}")
+            continue
+
+        if i == 0:
+            past_rank = 0
+            rank_gap = 0
+            rank_type = "NEW"
+        else:
+            if (point.report_date - data[i - 1].report_date).days != 7:
+                logger.warning(f"[weekly] [chart] First record for {point.report_date.strftime('%Y-%m-%d')} is not the first week of the year. Skipping. {song_id}")
+                continue
+            past_rank = data[i - 1].rank
+            rank_gap = abs(point.rank - past_rank)
+            if past_rank > 100:
+                rank_type = "NEW"
+            elif point.rank < past_rank:
+                rank_type = "UP"
+            elif point.rank > past_rank:
+                rank_type = "DOWN"
+            else:
+                rank_type = "NONE"
+
+        if existing_record:
+            if existing_record.current_rank != point.rank or existing_record.past_rank != past_rank or existing_record.rank_gap != rank_gap or existing_record.rank_type != rank_type:
+                logger.warning(
+                    f"[weekly] [chart] Record {point.report_date.strftime('%Y-%m-%d')} differ value: existing: {existing_record.current_rank}, {existing_record.past_rank}, {existing_record.rank_gap}, {existing_record.rank_type} | new: {point.rank}, {past_rank}, {rank_gap}, {rank_type}. {song_id}"
+                )
+            else:
+                logger.info(f"[weekly] [chart] Record already exists for {point.report_date.strftime('%Y-%m-%d')}, skipping. {song_id}")
+            continue
+
+        # Create a new record
+        new_record = SongChartSnapshot(
+            song_id=song_id,
+            chart_type=ChartType.WEEKLY,
+            rank_day=point.report_date,
+            rank_hour=None,
+            current_rank=point.rank,
+            past_rank=past_rank,
+            rank_gap=rank_gap,
+            rank_type=rank_type,
+        )
+        session.add(new_record)
+
+        logger.info(
+            "[weekly] %s %s (rank: %s, past_rank: %s, rank_gap: %s, rank_type: %s)",
+            point.report_date.strftime("%Y-%m-%d"),
+            song_id,
+            point.rank,
+            past_rank,
+            rank_gap,
+            rank_type
+        )
+
+
 @archive_log
 def main(chart_type: ChartType, commit: bool = False):
     try:
@@ -176,6 +247,9 @@ def main(chart_type: ChartType, commit: bool = False):
             for song_id in archive_songs:
                 if chart_type == ChartType.DAILY:
                     process_daily(song_id, session)
+                    continue
+                if chart_type == ChartType.WEEKLY:
+                    process_weekly(song_id, session)
                     continue
                 data = get_rank_data(chart_type, song_id)
                 print(f"Total: {len(data)}")
