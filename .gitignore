@@ -15,5 +15,5 @@ wheels/
 data/
 send*
 backup/
-extract/log/
+extract/log*/
 temp/
