@@ -294,11 +294,16 @@ def main(chart_type: ChartType, commit: bool = False):
                         else:
                             rank_type = "NONE"
                     elif chart_type == ChartType.REALTIME:
-                        if i == 0 or rank > 100:
-                            if rank <= 100:
-                                logger.warning(f"First record for {timestamp.strftime('%Y-%m-%d %H:%M')} has rank {rank}, which is not greater than 100. Skipping. {song_id}")
+                        if rank > 100:
+                            logger.info(f"Rank {rank} is greater than 100, skipping. {song_id} | {timestamp.strftime('%Y-%m-%d %H:%M')}")
                             continue
-                        past_rank = data[i - 1].rank
+                        if i == 0:
+                            past_rank = 0
+                        elif (timestamp - data[i - 1].timestamp).total_seconds() == 3600 or (timestamp.hour == 7 and data[i - 1].timestamp.hour == 1):
+                            past_rank = data[i - 1].rank
+                        else:
+                            logger.warning(f"Timestamp {timestamp.strftime('%Y-%m-%d %H:%M')} is not consecutive with previous timestamp {data[i - 1].timestamp.strftime('%Y-%m-%d %H:%M')}, skipping. {song_id}")
+                            continue
                         if past_rank > 100:
                             rank_gap = 0
                         else:
