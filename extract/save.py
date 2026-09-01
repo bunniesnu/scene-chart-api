@@ -73,7 +73,7 @@ def process_daily(song_id: str, session: Session):
                 logger.warning(f"[daily] [stream-report] Record {point.report_date.strftime('%Y-%m-%d')} has missing percent data. Still saving the record. {song_id} | {point.listener_count}, {point.male_percent}, {point.female_percent}, {[point.age_10s_percent, point.age_20s_percent, point.age_30s_percent, point.age_40s_percent, point.age_50s_percent, point.age_60s_percent]}")
 
             # Create a new record
-            new_record = SongStreamReport(
+            new_record_stream = SongStreamReport(
                 song_id=song_id,
                 report_date=point.report_date,
                 daily_listener_count=point.listener_count,
@@ -96,7 +96,7 @@ def process_daily(song_id: str, session: Session):
                 ]) != 0 else None,
                 source=DataSource.GUYSOME,
             )
-            session.add(new_record)
+            session.add(new_record_stream)
 
 
         # Song Chart Snapshot
@@ -253,130 +253,129 @@ def main(chart_type: ChartType, commit: bool = False):
             for song_id in archive_songs:
                 if chart_type == ChartType.DAILY:
                     process_daily(song_id, session)
-                    continue
-                if chart_type == ChartType.WEEKLY:
+                elif chart_type == ChartType.WEEKLY:
                     process_weekly(song_id, session)
-                    continue
-                data = get_rank_data(chart_type, song_id)
-                print(f"Total: {len(data)}")
-                for i, point in enumerate(data):
-                    timestamp = point.timestamp
-                    rank = point.rank
+                else:
+                    data = get_rank_data(chart_type, song_id)
+                    print(f"Total: {len(data)}")
+                    for i, point in enumerate(data):
+                        timestamp = point.timestamp
+                        rank = point.rank
 
-                    # Check if the record already exists
-                    existing_record = session.exec(
-                        select(SongChartSnapshot)
-                        .where(
-                            and_(
-                                SongChartSnapshot.song_id == song_id,
-                                SongChartSnapshot.chart_type == chart_type,
-                                SongChartSnapshot.rank_day == timestamp.date(),
-                                SongChartSnapshot.rank_hour == f"{timestamp.hour:0>2}:00",
+                        # Check if the record already exists
+                        existing_record = session.exec(
+                            select(SongChartSnapshot)
+                            .where(
+                                and_(
+                                    SongChartSnapshot.song_id == song_id,
+                                    SongChartSnapshot.chart_type == chart_type,
+                                    SongChartSnapshot.rank_day == timestamp.date(),
+                                    SongChartSnapshot.rank_hour == f"{timestamp.hour:0>2}:00",
+                                )
                             )
+                        ).first()
+
+                        if chart_type == ChartType.TOP100:
+                            if timestamp.hour in [1,8]:
+                                past_rank = rank
+                            elif i > 0 and (timestamp - data[i - 1].timestamp).total_seconds() == 3600:
+                                past_rank = data[i - 1].rank
+                            else:
+                                past_rank = 0
+
+                            if past_rank != 0:
+                                rank_gap = abs(rank - past_rank)
+                            else:
+                                rank_gap = 0
+
+                            if timestamp.hour in [1, 8]:
+                                rank_type = "NONE"
+                            elif past_rank == 0:
+                                rank_type = "NEW"
+                            elif rank < past_rank:
+                                rank_type = "UP"
+                            elif rank > past_rank:
+                                rank_type = "DOWN"
+                            else:
+                                rank_type = "NONE"
+                        elif chart_type == ChartType.REALTIME:
+                            if rank > 100:
+                                logger.info(f"Rank {rank} is greater than 100, skipping. {song_id} | {timestamp.strftime('%Y-%m-%d %H:%M')}")
+                                continue
+                            if i == 0:
+                                past_rank = 0
+                            elif (timestamp - data[i - 1].timestamp).total_seconds() == 3600 or (timestamp.hour == 7 and data[i - 1].timestamp.hour == 1):
+                                past_rank = data[i - 1].rank
+                            else:
+                                logger.warning(f"Timestamp {timestamp.strftime('%Y-%m-%d %H:%M')} is not consecutive with previous timestamp {data[i - 1].timestamp.strftime('%Y-%m-%d %H:%M')}, skipping. {song_id}")
+                                continue
+                            if past_rank > 100:
+                                rank_gap = 0
+                            else:
+                                rank_gap = abs(rank - past_rank)
+                            if past_rank > 100:
+                                rank_type = "NEW"
+                            elif rank < past_rank:
+                                rank_type = "UP"
+                            elif rank > past_rank:
+                                rank_type = "DOWN"
+                            else:
+                                rank_type = "NONE"
+                        elif chart_type == ChartType.HOT100:
+                            if i == 0:
+                                past_rank = 0
+                            elif timestamp.hour == 7 and data[i - 1].timestamp.hour == 1:
+                                past_rank = data[i - 1].rank
+                            elif (timestamp - data[i - 1].timestamp).total_seconds() == 3600:
+                                past_rank = data[i - 1].rank
+                            else:
+                                past_rank = 0
+
+                            if past_rank != 0:
+                                rank_gap = abs(rank - past_rank)
+                            else:
+                                rank_gap = 0
+
+                            if past_rank == 0:
+                                rank_type = "NEW"
+                            elif rank < past_rank:
+                                rank_type = "UP"
+                            elif rank > past_rank:
+                                rank_type = "DOWN"
+                            else:
+                                rank_type = "NONE"
+                        else:
+                            raise ValueError(f"Unsupported chart type: {chart_type}")
+
+                        if existing_record:
+                            if existing_record.current_rank != rank or existing_record.past_rank != past_rank or existing_record.rank_gap != rank_gap or existing_record.rank_type != rank_type:
+                                logger.warning(
+                                    f"Record {timestamp.strftime('%Y-%m-%d %H:%M')} differ value: existing: {existing_record.current_rank}, {existing_record.past_rank}, {existing_record.rank_gap}, {existing_record.rank_type} | new: {rank}, {past_rank}, {rank_gap}, {rank_type}."
+                                )
+                            else:
+                                logger.info(f"Record already exists for {timestamp.strftime("%Y-%m-%d %H:%M")}, skipping.")
+                            continue
+
+                        # Create a new record
+                        new_record = SongChartSnapshot(
+                            chart_type=chart_type,
+                            current_rank=rank,
+                            rank_day=timestamp.date(),
+                            rank_hour=f"{timestamp.hour:0>2}:00",
+                            song_id=song_id,
+                            past_rank=past_rank,
+                            rank_gap=rank_gap,
+                            rank_type=rank_type,
+                            source=DataSource.GUYSOME,
                         )
-                    ).first()
+                        session.add(new_record)
 
-                    if chart_type == ChartType.TOP100:
-                        if timestamp.hour in [1,8]:
-                            past_rank = rank
-                        elif i > 0 and (timestamp - data[i - 1].timestamp).total_seconds() == 3600:
-                            past_rank = data[i - 1].rank
-                        else:
-                            past_rank = 0
-
-                        if past_rank != 0:
-                            rank_gap = abs(rank - past_rank)
-                        else:
-                            rank_gap = 0
-
-                        if timestamp.hour in [1, 8]:
-                            rank_type = "NONE"
-                        elif past_rank == 0:
-                            rank_type = "NEW"
-                        elif rank < past_rank:
-                            rank_type = "UP"
-                        elif rank > past_rank:
-                            rank_type = "DOWN"
-                        else:
-                            rank_type = "NONE"
-                    elif chart_type == ChartType.REALTIME:
-                        if rank > 100:
-                            logger.info(f"Rank {rank} is greater than 100, skipping. {song_id} | {timestamp.strftime('%Y-%m-%d %H:%M')}")
-                            continue
-                        if i == 0:
-                            past_rank = 0
-                        elif (timestamp - data[i - 1].timestamp).total_seconds() == 3600 or (timestamp.hour == 7 and data[i - 1].timestamp.hour == 1):
-                            past_rank = data[i - 1].rank
-                        else:
-                            logger.warning(f"Timestamp {timestamp.strftime('%Y-%m-%d %H:%M')} is not consecutive with previous timestamp {data[i - 1].timestamp.strftime('%Y-%m-%d %H:%M')}, skipping. {song_id}")
-                            continue
-                        if past_rank > 100:
-                            rank_gap = 0
-                        else:
-                            rank_gap = abs(rank - past_rank)
-                        if past_rank > 100:
-                            rank_type = "NEW"
-                        elif rank < past_rank:
-                            rank_type = "UP"
-                        elif rank > past_rank:
-                            rank_type = "DOWN"
-                        else:
-                            rank_type = "NONE"
-                    elif chart_type == ChartType.HOT100:
-                        if i == 0:
-                            past_rank = 0
-                        elif timestamp.hour == 7 and data[i - 1].timestamp.hour == 1:
-                            past_rank = data[i - 1].rank
-                        elif (timestamp - data[i - 1].timestamp).total_seconds() == 3600:
-                            past_rank = data[i - 1].rank
-                        else:
-                            past_rank = 0
-
-                        if past_rank != 0:
-                            rank_gap = abs(rank - past_rank)
-                        else:
-                            rank_gap = 0
-
-                        if past_rank == 0:
-                            rank_type = "NEW"
-                        elif rank < past_rank:
-                            rank_type = "UP"
-                        elif rank > past_rank:
-                            rank_type = "DOWN"
-                        else:
-                            rank_type = "NONE"
-                    else:
-                        raise ValueError(f"Unsupported chart type: {chart_type}")
-
-                    if existing_record:
-                        if existing_record.current_rank != rank or existing_record.past_rank != past_rank or existing_record.rank_gap != rank_gap or existing_record.rank_type != rank_type:
-                            logger.warning(
-                                f"Record {timestamp.strftime('%Y-%m-%d %H:%M')} differ value: existing: {existing_record.current_rank}, {existing_record.past_rank}, {existing_record.rank_gap}, {existing_record.rank_type} | new: {rank}, {past_rank}, {rank_gap}, {rank_type}."
-                            )
-                        else:
-                            logger.info(f"Record already exists for {timestamp.strftime("%Y-%m-%d %H:%M")}, skipping.")
-                        continue
-
-                    # Create a new record
-                    new_record = SongChartSnapshot(
-                        chart_type=chart_type,
-                        current_rank=rank,
-                        rank_day=timestamp.date(),
-                        rank_hour=f"{timestamp.hour:0>2}:00",
-                        song_id=song_id,
-                        past_rank=past_rank,
-                        rank_gap=rank_gap,
-                        rank_type=rank_type,
-                        source=DataSource.GUYSOME,
-                    )
-                    session.add(new_record)
-
-                    logger.info(
-                        "[chart] %s %s %s",
-                        timestamp.strftime("%Y-%m-%d %H:%M"),
-                        chart_type.value,
-                        rank
-                    )
+                        logger.info(
+                            "[chart] %s %s %s",
+                            timestamp.strftime("%Y-%m-%d %H:%M"),
+                            chart_type.value,
+                            rank
+                        )
 
                 if commit:
                     session.commit()
