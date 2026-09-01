@@ -56,7 +56,7 @@ def process_daily(song_id: str, session: Session):
                     f"[daily] [stream-report] Record {point.report_date.strftime('%Y-%m-%d')} differ value: existing: {existing_record.daily_listener_count}, {existing_record.male_percent}, {existing_record.female_percent}, {existing_record.age_percent} | new: {point.listener_count}, {point.male_percent}, {point.female_percent}, {[point.age_10s_percent, point.age_20s_percent, point.age_30s_percent, point.age_40s_percent, point.age_50s_percent, point.age_60s_percent]}."
                 )
             else:
-                logger.info(f"[daily] [stream-report] Record already exists for {point.report_date}, skipping.")
+                logger.info(f"[daily] [stream-report] Record already exists for {point.report_date}, skipping. {song_id}")
         else:
             if (
                 point.male_percent is None
@@ -143,7 +143,7 @@ def process_daily(song_id: str, session: Session):
                         f"[daily] [chart] Record {point.report_date.strftime('%Y-%m-%d')} differ value: existing: {existing_record.current_rank}, {existing_record.past_rank}, {existing_record.rank_gap}, {existing_record.rank_type} | new: {point.rank}, {past_rank}, {rank_gap}, {rank_type}."
                     )
                 else:
-                    logger.info(f"[daily] [chart] Record already exists for {point.report_date.strftime('%Y-%m-%d')}, skipping.")
+                    logger.info(f"[daily] [chart] Record already exists for {point.report_date.strftime('%Y-%m-%d')}, skipping. {song_id}")
             else:
                 # Create a new record
                 new_record = SongChartSnapshot(
@@ -353,7 +353,7 @@ def main(chart_type: ChartType, commit: bool = False):
                                     f"Record {timestamp.strftime('%Y-%m-%d %H:%M')} differ value: existing: {existing_record.current_rank}, {existing_record.past_rank}, {existing_record.rank_gap}, {existing_record.rank_type} | new: {rank}, {past_rank}, {rank_gap}, {rank_type}."
                                 )
                             else:
-                                logger.info(f"Record already exists for {timestamp.strftime("%Y-%m-%d %H:%M")}, skipping.")
+                                logger.info(f"Record already exists for {timestamp.strftime("%Y-%m-%d %H:%M")}, skipping. {song_id}")
                             continue
 
                         # Create a new record
@@ -371,10 +371,14 @@ def main(chart_type: ChartType, commit: bool = False):
                         session.add(new_record)
 
                         logger.info(
-                            "[chart] %s %s %s",
+                            "[chart] %s %s %s %s %s %s %s",
                             timestamp.strftime("%Y-%m-%d %H:%M"),
                             chart_type.value,
-                            rank
+                            rank,
+                            past_rank,
+                            rank_gap,
+                            rank_type,
+                            song_id
                         )
 
                 if commit:
