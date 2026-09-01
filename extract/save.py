@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 from sqlmodel import Session, and_, select
 
-from src.db.tables import ChartType, Song, SongArtist, SongChartSnapshot, SongStreamReport
+from src.db.tables import ChartType, DataSource, Song, SongArtist, SongChartSnapshot, SongStreamReport
 
 from extract.data import get_daily_rank_data, get_rank_data, get_weekly_rank_data
 from src.utils.logger import archive_log
@@ -93,7 +93,8 @@ def process_daily(song_id: str, session: Session):
                     point.age_40s_percent,
                     point.age_50s_percent,
                     point.age_60s_percent,
-                ]) != 0 else None
+                ]) != 0 else None,
+                source=DataSource.GUYSOME,
             )
             session.add(new_record)
 
@@ -154,6 +155,7 @@ def process_daily(song_id: str, session: Session):
                     past_rank=past_rank,
                     rank_gap=rank_gap,
                     rank_type=rank_type,
+                    source=DataSource.GUYSOME,
                 )
                 session.add(new_record)
 
@@ -224,6 +226,7 @@ def process_weekly(song_id: str, session: Session):
             past_rank=past_rank,
             rank_gap=rank_gap,
             rank_type=rank_type,
+            source=DataSource.GUYSOME,
         )
         session.add(new_record)
 
@@ -364,6 +367,7 @@ def main(chart_type: ChartType, commit: bool = False):
                         past_rank=past_rank,
                         rank_gap=rank_gap,
                         rank_type=rank_type,
+                        source=DataSource.GUYSOME,
                     )
                     session.add(new_record)
 
