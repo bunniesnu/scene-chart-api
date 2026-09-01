@@ -388,3 +388,4 @@ if __name__ == "__main__":
     main(ChartType.REALTIME, True)
     main(ChartType.HOT100, True)
     main(ChartType.DAILY, True)
+    main(ChartType.WEEKLY, True)
