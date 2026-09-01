@@ -191,7 +191,7 @@ def process_weekly(song_id: str, session: Session):
             rank_type = "NEW"
         else:
             if (point.report_date - data[i - 1].report_date).days != 7:
-                logger.warning(f"[weekly] [chart] First record for {point.report_date.strftime('%Y-%m-%d')} is not the first week of the year. Skipping. {song_id}")
+                logger.warning(f"[weekly] [chart] Record {point.report_date.strftime('%Y-%m-%d')} is not consecutive with previous record {data[i - 1].report_date.strftime('%Y-%m-%d')}. Skipping. {song_id}")
                 continue
             past_rank = data[i - 1].rank
             if past_rank > 100:
