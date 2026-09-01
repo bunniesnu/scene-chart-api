@@ -42,7 +42,6 @@ class ChartEntryResponse(APIModel):
 
 class ChartResponse(APIModel):
     chart_type: ChartType
-    fetched_at: datetime
     entries: list[ChartEntryResponse]
 
 
