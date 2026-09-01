@@ -38,6 +38,7 @@ from melon import MelonClient
 
 from src.db.tables import (
     ChartType,
+    DataSource,
     GraphResolution,
     Song,
     SongArtist,
@@ -172,6 +173,8 @@ def _archive_song_chart(
                 past_rank=song.past_rank,
                 rank_gap=song.rank_gap,
                 rank_type=song.rank_type,
+
+                source=DataSource.MELON_API,
             )
         )
 
@@ -669,7 +672,9 @@ def _archive_stream_report(
         female_percent=Decimal(gender.female) if gender else None,
         age_percent=new_report.age_percent,
 
-        yesterday_rank=song_detail.achievement.yesterday_chart_rank if song_detail.achievement else None
+        yesterday_rank=song_detail.achievement.yesterday_chart_rank if song_detail.achievement else None,
+
+        source=DataSource.MELON_API,
     )
     session.add(new)
     logger.info(
