@@ -7,7 +7,7 @@ localtimezone = ZoneInfo("Asia/Seoul")
 
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 
 TOP100_URL = "https://xn--o39an51b2re.com/chart/melon/top100/trend/ranking/"
@@ -179,7 +179,7 @@ def get_daily_rank_data(song_id: str) -> list[DailyRankData]:
 
         results.append(
             DailyRankData(
-                report_date=report_date,
+                report_date=(report_date + timedelta(days=1)),  # Match convention: guyso.me's chart date is the day before the report date convention, so we add 1 day to match the report date.
                 rank=parse_int(cells[1].get_text(strip=True)),
                 listener_count=parse_int(cells[2].get_text(strip=True)),
                 listener_change=parse_int(cells[3].get_text(strip=True)),
