@@ -200,8 +200,18 @@ def get_daily_rank_data(song_id: str) -> list[DailyRankData]:
 class WeeklyRankData(BaseModel):
     year: int
     week: int
+    report_date: date
     rank: int
     rank_change: int | None
+
+def get_week_sunday(year: int, week: int) -> date:
+    jan4 = date(year, 1, 4)
+
+    # First Sunday on or after Jan 4
+    first_sunday = jan4 + timedelta(days=(6 - jan4.weekday()) % 7)
+
+    # Each subsequent week is 7 days later
+    return first_sunday + timedelta(weeks=week - 1)
 
 def parse_rank_change(value: str) -> int | None:
     value = value.strip()
@@ -260,6 +270,7 @@ def get_weekly_rank_data(song_id: str) -> list[WeeklyRankData]:
             WeeklyRankData(
                 year=year,
                 week=week,
+                report_date=get_week_sunday(year, week),
                 rank=rank,
                 rank_change=rank_change,
             )
