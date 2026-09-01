@@ -22,3 +22,34 @@ services:
       - ./crontab:/app/crontab:ro
     command: ["supercronic", "/app/crontab"]
     restart: unless-stopped
+  nginx:
+    image: nginx:1.28.3
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./data/log/nginx:/var/log/nginx
+      - ./nginx:/etc/nginx/templates:ro
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/www/certbot
+    depends_on:
+      - app
+    restart: unless-stopped
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/www/certbot
+    environment:
+      DOMAIN: ${DOMAIN}
+      EMAIL: ${EMAIL}
+    depends_on:
+      - nginx
+    entrypoint: >
+      sh -c "while true; do certbot renew --non-interactive --webroot -w /var/www/certbot --quiet; sleep 12h; done"
+
+volumes:
+  certbot-etc:
+  certbot-var:

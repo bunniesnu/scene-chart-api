@@ -9,14 +9,20 @@ ifeq ($(ENV),local)
 	COMPOSE := docker compose -f $(LOCAL_DOCKER_COMPOSE_FILE) --project-directory . -p "$(LOCAL_PROJECT_NAME)"
 else ifeq ($(ENV),production)
 	COMPOSE := docker compose -f $(DOCKER_COMPOSE_FILE) --project-directory . -p "$(PROJECT_NAME)"
+	COMPOSE_INIT := docker compose -f ./init/docker-compose.yml --project-directory . -p "$(PROJECT_NAME)"
 else
 	$(error Unknown ENV '$(ENV)'. Use 'production' or 'local')
 endif
 
-.PHONY: build stop run logs restore revision main
+.PHONY: build certificate stop run logs restore revision main
 
 build:
 	COMPOSE_BAKE=true $(COMPOSE) build
+
+certificate:
+	set -e; \
+	trap '$(COMPOSE_INIT) down' EXIT; \
+	$(COMPOSE_INIT) up --exit-code-from certbot
 
 stop:
 	$(COMPOSE) down
@@ -35,7 +41,7 @@ run: build stop
 
 else
 
-run: build stop
+run: build stop certificate
 	$(COMPOSE) up -d
 
 endif

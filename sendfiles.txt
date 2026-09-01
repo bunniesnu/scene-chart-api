@@ -1,0 +1,17 @@
+alembic/
+archive/
+docker/
+init/
+jobs/
+nginx/
+scripts/
+src/
+.dockerignore
+.env.gpg
+.python-version
+alembic.ini
+crontab
+main.py
+Makefile
+pyproject.toml
+uv.lock
