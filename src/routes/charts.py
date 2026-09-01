@@ -21,22 +21,24 @@ def get_latest_chart(
     session: Session = Depends(get_session),
 ):
     latest = session.exec(
-        select(func.max(SongChartSnapshot.rank_day), func.max(SongChartSnapshot.rank_hour))
+        select(SongChartSnapshot)
         .join(Song, and_(Song.song_id == SongChartSnapshot.song_id))
         .join(SongArtist, and_(SongArtist.song_id == Song.song_id))
         .where(
             SongArtist.artist_id == ARTIST_ID,
             SongChartSnapshot.chart_type == chart_type,
         )
-    ).one_or_none()
+        .order_by(
+            col(SongChartSnapshot.rank_day).desc(),
+            col(SongChartSnapshot.rank_hour).desc(),
+        )
+    ).first()
 
     if latest is None:
         raise HTTPException(
             status_code=404,
             detail="No chart data found",
         )
-
-    latest_rank_day, latest_rank_hour = latest
 
     snapshots = session.exec(
         select(SongChartSnapshot, Song)
@@ -45,8 +47,8 @@ def get_latest_chart(
         .where(
             SongArtist.artist_id == ARTIST_ID,
             SongChartSnapshot.chart_type == chart_type,
-            SongChartSnapshot.rank_day == latest_rank_day,
-            SongChartSnapshot.rank_hour == latest_rank_hour,
+            SongChartSnapshot.rank_day == latest.rank_day,
+            SongChartSnapshot.rank_hour == latest.rank_hour,
         )
         .order_by(col(SongChartSnapshot.current_rank))
     ).all()
