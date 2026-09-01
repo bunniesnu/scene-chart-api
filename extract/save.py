@@ -51,55 +51,53 @@ def process_daily(song_id: str, session: Session):
                 )
             ):
                 logger.warning(
-                    f"Record {point.report_date.strftime('%Y-%m-%d')} differ value: existing: {existing_record.daily_listener_count}, {existing_record.male_percent}, {existing_record.female_percent}, {existing_record.age_percent} | new: {point.listener_count}, {point.male_percent}, {point.female_percent}, {[point.age_10s_percent, point.age_20s_percent, point.age_30s_percent, point.age_40s_percent, point.age_50s_percent, point.age_60s_percent]}."
+                    f"[daily] [stream-report] Record {point.report_date.strftime('%Y-%m-%d')} differ value: existing: {existing_record.daily_listener_count}, {existing_record.male_percent}, {existing_record.female_percent}, {existing_record.age_percent} | new: {point.listener_count}, {point.male_percent}, {point.female_percent}, {[point.age_10s_percent, point.age_20s_percent, point.age_30s_percent, point.age_40s_percent, point.age_50s_percent, point.age_60s_percent]}."
                 )
             else:
-                logger.info(f"Record already exists for {point.report_date}, skipping.")
-            continue
+                logger.info(f"[daily] [stream-report] Record already exists for {point.report_date}, skipping.")
+        else:
+            if (
+                point.male_percent is None
+                or point.female_percent is None
+                or sum([
+                    point.age_10s_percent,
+                    point.age_20s_percent,
+                    point.age_30s_percent,
+                    point.age_40s_percent,
+                    point.age_50s_percent,
+                    point.age_60s_percent,
+                ]) == 0
+            ):
+                logger.warning(f"[daily] [stream-report] Record {point.report_date.strftime('%Y-%m-%d')} has missing percent data. Still saving the record. {song_id} | {point.listener_count}, {point.male_percent}, {point.female_percent}, {[point.age_10s_percent, point.age_20s_percent, point.age_30s_percent, point.age_40s_percent, point.age_50s_percent, point.age_60s_percent]}")
 
-        if (
-            point.male_percent is None
-            or point.female_percent is None
-            or sum([
-                point.age_10s_percent,
-                point.age_20s_percent,
-                point.age_30s_percent,
-                point.age_40s_percent,
-                point.age_50s_percent,
-                point.age_60s_percent,
-            ]) == 0
-        ):
-            logger.warning(f"Record {point.report_date.strftime('%Y-%m-%d')} has missing percent data. Still saving the record. {song_id} | {point.listener_count}, {point.male_percent}, {point.female_percent}, {[point.age_10s_percent, point.age_20s_percent, point.age_30s_percent, point.age_40s_percent, point.age_50s_percent, point.age_60s_percent]}")
-
-        # Create a new record
-        new_record = SongStreamReport(
-            song_id=song_id,
-            report_date=point.report_date,
-            daily_listener_count=point.listener_count,
-            male_percent=Decimal(point.male_percent) if point.male_percent else None,
-            female_percent=Decimal(point.female_percent) if point.female_percent else None,
-            age_percent=[
-                point.age_10s_percent,
-                point.age_20s_percent,
-                point.age_30s_percent,
-                point.age_40s_percent,
-                point.age_50s_percent,
-                point.age_60s_percent,
-            ] if sum([
-                point.age_10s_percent,
-                point.age_20s_percent,
-                point.age_30s_percent,
-                point.age_40s_percent,
-                point.age_50s_percent,
-                point.age_60s_percent,
-            ]) != 0 else None
-        )
-        session.add(new_record)
+            # Create a new record
+            new_record = SongStreamReport(
+                song_id=song_id,
+                report_date=point.report_date,
+                daily_listener_count=point.listener_count,
+                male_percent=Decimal(point.male_percent) if point.male_percent else None,
+                female_percent=Decimal(point.female_percent) if point.female_percent else None,
+                age_percent=[
+                    point.age_10s_percent,
+                    point.age_20s_percent,
+                    point.age_30s_percent,
+                    point.age_40s_percent,
+                    point.age_50s_percent,
+                    point.age_60s_percent,
+                ] if sum([
+                    point.age_10s_percent,
+                    point.age_20s_percent,
+                    point.age_30s_percent,
+                    point.age_40s_percent,
+                    point.age_50s_percent,
+                    point.age_60s_percent,
+                ]) != 0 else None
+            )
+            session.add(new_record)
 
         logger.info(
-            "[chart] %s %s %s",
+            "[daily] %s %s",
             point.report_date.strftime("%Y-%m-%d"),
-            ChartType.DAILY.value,
             song_id
         )
 
