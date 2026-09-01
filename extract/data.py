@@ -14,6 +14,7 @@ TOP100_URL = "https://xn--o39an51b2re.com/chart/melon/top100/trend/ranking/"
 REALTIME_URL = "https://xn--o39an51b2re.com/chart/melon/realtime/trend/ranking/"
 HOT100_URL = "https://xn--o39an51b2re.com/chart/melon/hot100-d100/trend/ranking/"
 DAILY_URL = "https://xn--o39an51b2re.com/chart/melon/daily/trend/ranking/"
+WEEKLY_URL = "https://xn--o39an51b2re.com/chart/melon/weekly/trend/ranking/"
 
 def get_url(chart_type: ChartType, song_id: str) -> str:
     if chart_type == ChartType.TOP100:
@@ -196,10 +197,95 @@ def get_daily_rank_data(song_id: str) -> list[DailyRankData]:
 
     return results
 
+
+# Weekly rank data extraction
+
+class WeeklyRankData(BaseModel):
+    year: int
+    week: int
+    rank: int | None
+    rank_change: int | None
+
+def parse_rank_change(value: str) -> int | None:
+    value = value.strip()
+
+    if value == "-":
+        return 0
+
+    if value == "NEW":
+        return None
+
+    value = value.replace("▲", "+").replace("▼", "-")
+
+    return int(value)
+
+def get_weekly_rank_data(song_id: str) -> list[WeeklyRankData]:
+    response = requests.get(
+        f"{WEEKLY_URL}{song_id}",
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/151.0.0.0 Safari/537.36"
+            )
+        },
+        timeout=10,
+    )
+    response.raise_for_status()
+
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    table = soup.select_one("#trend-table")
+    if table is None:
+        raise ValueError("Could not find #trend-table")
+
+    results: list[WeeklyRankData] = []
+
+    for row in table.select("tbody tr"):
+        cells = row.select("td")
+
+        if len(cells) < 4:
+            continue
+
+        year_text = cells[0].get_text(strip=True)
+        week_text = cells[1].get_text(strip=True)
+        rank_text = cells[2].get_text(strip=True)
+        change_text = cells[3].get_text(strip=True)
+
+        try:
+            year = int(year_text)
+            week = int(week_text)
+        except ValueError:
+            continue
+
+        try:
+            rank = int(rank_text)
+        except ValueError:
+            rank = None
+
+        try:
+            rank_change = parse_rank_change(change_text)
+        except ValueError:
+            rank_change = None
+
+        results.append(
+            WeeklyRankData(
+                year=year,
+                week=week,
+                rank=rank,
+                rank_change=rank_change,
+            )
+        )
+
+    return results
+
 if __name__ == "__main__":
     rank_data = get_rank_data(ChartType.TOP100, "37928381")
     for data in rank_data:
         print(data)
     daily_rank_data = get_daily_rank_data("37928381")
     for data in daily_rank_data:
+        print(data)
+    weekly_rank_data = get_weekly_rank_data("37928381")
+    for data in weekly_rank_data:
         print(data)
