@@ -43,6 +43,12 @@ class GraphResolution(str, Enum):
     FIVE_MIN = "five_min"    # ChartClient.get_hot100_graph_five -> FiveGraph
 
 
+class DataSource(str, Enum):
+    MELON_API = "melon_api"
+    GUYSOME = "guysome"
+    MANUAL = "manual"
+
+
 # ---------------------------------------------------------------------------
 # Dimension: Artist
 # ---------------------------------------------------------------------------
@@ -282,6 +288,19 @@ class SongChartSnapshot(SQLModel, table=True):
 
     song: Song = Relationship(back_populates="chart_snapshots")
 
+    source: DataSource = Field(
+        default=DataSource.MANUAL,
+        sa_column=Column(
+            SAEnum(
+                DataSource,
+                values_callable=lambda enum: [item.value for item in enum],
+                name="datasource",
+            ),
+            nullable=False,
+            default=DataSource.MANUAL.value,
+        )
+    )
+
 
 # ---------------------------------------------------------------------------
 # Time series: chart report (listener stats + rank), from ChartReport
@@ -501,4 +520,17 @@ class SongStreamReport(SQLModel, table=True):
     age_percent: list[int] | None = Field(
         default=None,
         sa_column=Column(ARRAY(INTEGER))
+    )
+
+    source: DataSource = Field(
+        default=DataSource.MANUAL,
+        sa_column=Column(
+            SAEnum(
+                DataSource,
+                values_callable=lambda enum: [item.value for item in enum],
+                name="datasource",
+            ),
+            nullable=False,
+            default=DataSource.MANUAL.value,
+        )
     )
