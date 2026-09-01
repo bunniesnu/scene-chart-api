@@ -71,10 +71,7 @@ def get_rank_data(chart_type: ChartType, song_id: str) -> list[RankData]:
             if not value:
                 continue
 
-            try:
-                rank = int(value)
-            except ValueError:
-                continue
+            rank = int(value)
 
             timestamp = datetime.strptime(
                 f"{date}{hour:02d}",
@@ -203,7 +200,7 @@ def get_daily_rank_data(song_id: str) -> list[DailyRankData]:
 class WeeklyRankData(BaseModel):
     year: int
     week: int
-    rank: int | None
+    rank: int
     rank_change: int | None
 
 def parse_rank_change(value: str) -> int | None:
@@ -252,21 +249,12 @@ def get_weekly_rank_data(song_id: str) -> list[WeeklyRankData]:
         rank_text = cells[2].get_text(strip=True)
         change_text = cells[3].get_text(strip=True)
 
-        try:
-            year = int(year_text)
-            week = int(week_text)
-        except ValueError:
-            continue
+        year = int(year_text)
+        week = int(week_text)
 
-        try:
-            rank = int(rank_text)
-        except ValueError:
-            rank = None
+        rank = int(rank_text)
 
-        try:
-            rank_change = parse_rank_change(change_text)
-        except ValueError:
-            rank_change = None
+        rank_change = parse_rank_change(change_text)
 
         results.append(
             WeeklyRankData(
