@@ -18,7 +18,9 @@ from src.const import ARTIST_ID
 
 def process_daily(song_id: str, session: Session):
     data = get_daily_rank_data(song_id)
-    for point in data:
+    for i, point in enumerate(data):
+        # Song Stream Report
+
         # Check if the record already exists
         existing_record = session.exec(
             select(SongStreamReport)
@@ -94,6 +96,66 @@ def process_daily(song_id: str, session: Session):
                 ]) != 0 else None
             )
             session.add(new_record)
+
+
+        # Song Chart Snapshot
+
+        if point.rank is not None and point.rank <= 100:
+            # Check if the record already exists
+            existing_record = session.exec(
+                select(SongChartSnapshot)
+                .where(
+                    and_(
+                        SongChartSnapshot.song_id == song_id,
+                        SongChartSnapshot.chart_type == ChartType.DAILY,
+                        SongChartSnapshot.rank_day == point.report_date,
+                    )
+                )
+            ).first()
+
+            if i == 0:
+                past_rank = 0
+            else:
+                _past = data[i - 1]
+                if (point.report_date - _past.report_date).days == 1 and _past.rank is not None and _past.rank <= 100:
+                    past_rank = _past.rank
+                else:
+                    past_rank = 0
+
+            if past_rank != 0:
+                rank_gap = abs(point.rank - past_rank)
+            else:
+                rank_gap = 0
+
+            if past_rank == 0:
+                rank_type = "NEW"
+            elif point.rank < past_rank:
+                rank_type = "UP"
+            elif point.rank > past_rank:
+                rank_type = "DOWN"
+            else:
+                rank_type = "NONE"
+
+            if existing_record:
+                if existing_record.current_rank != point.rank or existing_record.past_rank != past_rank or existing_record.rank_gap != rank_gap or existing_record.rank_type != rank_type:
+                    logger.warning(
+                        f"[daily] [chart] Record {point.report_date.strftime('%Y-%m-%d')} differ value: existing: {existing_record.current_rank}, {existing_record.past_rank}, {existing_record.rank_gap}, {existing_record.rank_type} | new: {point.rank}, {past_rank}, {rank_gap}, {rank_type}."
+                    )
+                else:
+                    logger.info(f"[daily] [chart] Record already exists for {point.report_date.strftime('%Y-%m-%d')}, skipping.")
+            else:
+                # Create a new record
+                new_record = SongChartSnapshot(
+                    song_id=song_id,
+                    chart_type=ChartType.DAILY,
+                    rank_day=point.report_date,
+                    rank_hour=None,
+                    current_rank=point.rank,
+                    past_rank=past_rank,
+                    rank_gap=rank_gap,
+                    rank_type=rank_type,
+                )
+                session.add(new_record)
 
         logger.info(
             "[daily] %s %s",
