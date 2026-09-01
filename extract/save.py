@@ -374,11 +374,11 @@ def main(chart_type: ChartType, commit: bool = False):
                             "[chart] %s %s %s %s %s %s %s",
                             timestamp.strftime("%Y-%m-%d %H:%M"),
                             chart_type.value,
+                            song_id,
                             rank,
                             past_rank,
                             rank_gap,
                             rank_type,
-                            song_id
                         )
 
                 if commit:
