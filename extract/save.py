@@ -37,6 +37,7 @@ def process_daily(song_id: str, session: Session):
                 existing_record.daily_listener_count != point.listener_count
                 or existing_record.male_percent != point.male_percent
                 or existing_record.female_percent != point.female_percent
+                or existing_record.yesterday_rank != point.rank
                 or (
                     existing_record.age_percent is None
                     and sum([point.age_10s_percent, point.age_20s_percent, point.age_30s_percent, point.age_40s_percent, point.age_50s_percent, point.age_60s_percent]) != 0
@@ -53,7 +54,7 @@ def process_daily(song_id: str, session: Session):
                 )
             ):
                 logger.warning(
-                    f"[daily] [stream-report] Record {point.report_date.strftime('%Y-%m-%d')} differ value: existing: {existing_record.daily_listener_count}, {existing_record.male_percent}, {existing_record.female_percent}, {existing_record.age_percent} | new: {point.listener_count}, {point.male_percent}, {point.female_percent}, {[point.age_10s_percent, point.age_20s_percent, point.age_30s_percent, point.age_40s_percent, point.age_50s_percent, point.age_60s_percent]}."
+                    f"[daily] [stream-report] Record {point.report_date.strftime('%Y-%m-%d')} differ value: existing: {existing_record.daily_listener_count}, {existing_record.male_percent}, {existing_record.female_percent}, {existing_record.yesterday_rank}, {existing_record.age_percent} | new: {point.listener_count}, {point.male_percent}, {point.female_percent}, {point.rank}, {[point.age_10s_percent, point.age_20s_percent, point.age_30s_percent, point.age_40s_percent, point.age_50s_percent, point.age_60s_percent]}."
                 )
             else:
                 logger.info(f"[daily] [stream-report] Record already exists for {point.report_date}, skipping. {song_id}")
@@ -79,6 +80,7 @@ def process_daily(song_id: str, session: Session):
                 daily_listener_count=point.listener_count,
                 male_percent=Decimal(point.male_percent) if point.male_percent else None,
                 female_percent=Decimal(point.female_percent) if point.female_percent else None,
+                yesterday_rank=point.rank,
                 age_percent=[
                     point.age_10s_percent,
                     point.age_20s_percent,
