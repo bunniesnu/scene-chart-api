@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from os import getenv
 
-from src.routes import artist, charts
+from src.routes import artist, charts, reports
 
 app = FastAPI()
 
@@ -18,3 +18,4 @@ app.add_middleware(
 
 app.include_router(artist.router)
 app.include_router(charts.router)
+app.include_router(reports.router)
