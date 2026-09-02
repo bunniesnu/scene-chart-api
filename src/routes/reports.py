@@ -35,7 +35,7 @@ def get_song_stream_report_history(
                 total_listener_count=snapshot.total_listener_count,
                 male_percent=snapshot.male_percent,
                 female_percent=snapshot.female_percent,
-                yesterday_rank=snapshot.yesterday_rank,
+                yesterday_rank=snapshot.yesterday_rank if snapshot.yesterday_rank is not None and snapshot.yesterday_rank < 1001 else None,
                 age_percent=snapshot.age_percent,
             ) for snapshot in song_snapshots
         ]
