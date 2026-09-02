@@ -1,3 +1,4 @@
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 from pydantic import BaseModel
 
@@ -96,8 +97,8 @@ class DailyRankData(BaseModel):
     listener_count: int | None
     listener_change: int | None
 
-    male_percent: float | None
-    female_percent: float | None
+    male_percent: Decimal | None
+    female_percent: Decimal | None
 
     age_10s_percent: int
     age_20s_percent: int
@@ -114,13 +115,13 @@ def parse_int(value: str) -> int | None:
 
     return int(value.replace(",", "").replace("+", ""))
 
-def parse_percent(value: str) -> float | None:
+def parse_percent(value: str) -> Decimal | None:
     value = value.strip()
 
     if value == "-":
         return None
 
-    return float(value.rstrip("%"))
+    return Decimal(value.rstrip("%"))
 
 def parse_age_percent(value: str) -> int:
     value = value.strip()
