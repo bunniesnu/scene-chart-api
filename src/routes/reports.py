@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from src.db.db import get_session
 from src.db.tables import SongStreamReport
@@ -17,7 +17,11 @@ def get_song_stream_report_history(
     session: Session = Depends(get_session),
     songId: str = Query(),
 ):
-    song_snapshots = session.exec(select(SongStreamReport).where(SongStreamReport.song_id == songId)).all()
+    song_snapshots = session.exec(
+        select(SongStreamReport)
+        .where(SongStreamReport.song_id == songId)
+        .order_by(col(SongStreamReport.report_date).asc())
+    ).all()
 
     return SongStreamReportHistoryResponse(
         song_id=songId,
