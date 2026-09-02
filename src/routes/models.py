@@ -1,4 +1,5 @@
 from datetime import datetime, date
+from decimal import Decimal
 from pydantic import BaseModel, ConfigDict
 from uuid import UUID
 
@@ -64,3 +65,26 @@ class ChartHistoryResponse(APIModel):
 class ArtistSongsResponse(APIModel):
     artist_id: str
     songs: list[SongResponse]
+
+
+class SongStreamReportSnapshotResponse(APIModel):
+    fetched_at: datetime
+    updated_at: datetime
+
+    report_date: date
+
+    daily_listener_count: int | None
+    total_listen_count: int | None
+    total_listener_count: int | None
+
+    male_percent: Decimal | None
+    female_percent: Decimal | None
+
+    yesterday_rank: int | None
+
+    age_percent: list[int] | None
+
+
+class SongStreamReportHistoryResponse(APIModel):
+    song_id: str
+    snapshots: list[SongStreamReportSnapshotResponse]
