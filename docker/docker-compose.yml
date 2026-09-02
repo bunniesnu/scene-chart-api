@@ -7,6 +7,7 @@ services:
       sh -c "uv run --no-sync alembic upgrade head && uv run --no-sync uvicorn src.app:app --host 0.0.0.0 --port 8000"
     environment:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
+      FRONTEND_HOSTS: ${FRONTEND_HOSTS}
     restart: unless-stopped
   scheduler:
     build:
@@ -16,7 +17,6 @@ services:
       TZ: Asia/Seoul
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
       WEBHOOK_URL: ${WEBHOOK_URL}
-      FRONTEND_HOSTS: ${FRONTEND_HOSTS}
     volumes:
       - ./data/log/app:/app/logs
       - ./data/cursor:/app/cursor
