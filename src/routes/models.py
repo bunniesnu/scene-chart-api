@@ -14,6 +14,7 @@ class SongResponse(APIModel):
     song_id: str
     title: str
     album_id: str | None
+    album_name: str | None
     album_cover_url: str | None
     play_time: int | None
     issue_date: str | None

@@ -30,6 +30,7 @@ def get_artist_songs(
                 song_id=song.song_id,
                 title=song.title,
                 album_id=song.album_id,
+                album_name=(song.album.name if song.album else None),
                 album_cover_url=(song.album.cover_url if song.album else None),
                 play_time=song.play_time,
                 issue_date=song.issue_date,
