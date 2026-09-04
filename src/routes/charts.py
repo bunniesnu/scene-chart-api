@@ -40,12 +40,33 @@ def get_latest_chart(
             detail="No chart data found",
         )
 
+    latest_per_song = (
+        select(
+            SongChartSnapshot.song_id,
+            func.max(SongChartSnapshot.fetched_at).label("latest_fetched_at"),
+        )
+        .join(SongArtist, and_(SongArtist.song_id == SongChartSnapshot.song_id))
+        .where(
+            SongArtist.artist_id == ARTIST_ID,
+            SongChartSnapshot.chart_type == chart_type,
+            SongChartSnapshot.rank_day == latest.rank_day,
+            SongChartSnapshot.rank_hour == latest.rank_hour,
+        )
+        .group_by(SongChartSnapshot.song_id)
+        .subquery()
+    )
+
     snapshots = session.exec(
         select(SongChartSnapshot, Song)
         .join(Song, and_(Song.song_id == SongChartSnapshot.song_id))
-        .join(SongArtist, and_(SongArtist.song_id == Song.song_id))
+        .join(
+            latest_per_song,
+            and_(
+                latest_per_song.c.song_id == SongChartSnapshot.song_id,
+                latest_per_song.c.latest_fetched_at == SongChartSnapshot.fetched_at,
+            )
+        )
         .where(
-            SongArtist.artist_id == ARTIST_ID,
             SongChartSnapshot.chart_type == chart_type,
             SongChartSnapshot.rank_day == latest.rank_day,
             SongChartSnapshot.rank_hour == latest.rank_hour,
