@@ -113,10 +113,39 @@ def get_chart_history(
     session: Session = Depends(get_session),
     songId: str = Query(),
 ):
+    latest_per_slot = (
+        select(
+            col(SongChartSnapshot.song_id),
+            col(SongChartSnapshot.rank_day),
+            col(SongChartSnapshot.rank_hour),
+            func.max(SongChartSnapshot.fetched_at).label("latest_fetched_at"),
+        ) 
+        .where(
+            SongChartSnapshot.chart_type == chart_type,
+            SongChartSnapshot.song_id == songId,
+        )
+        .group_by(
+            col(SongChartSnapshot.song_id),
+            col(SongChartSnapshot.rank_day),
+            col(SongChartSnapshot.rank_hour),
+        )
+        .subquery()
+    )
     song_snapshots = session.exec(
         select(SongChartSnapshot, Song)
         .join(Song, and_(Song.song_id == SongChartSnapshot.song_id))
         .join(SongArtist, and_(SongArtist.song_id == Song.song_id))
+        .join(
+            latest_per_slot,
+            and_(
+                latest_per_slot.c.song_id == SongChartSnapshot.song_id,
+                latest_per_slot.c.rank_day == SongChartSnapshot.rank_day,
+                col(latest_per_slot.c.rank_hour).is_not_distinct_from(
+                    SongChartSnapshot.rank_hour
+                ),
+                latest_per_slot.c.latest_fetched_at == SongChartSnapshot.fetched_at,
+            ),
+        )
         .where(
             SongArtist.artist_id == ARTIST_ID,
             SongChartSnapshot.chart_type == chart_type,
