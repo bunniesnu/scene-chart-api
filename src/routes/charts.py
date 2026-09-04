@@ -6,11 +6,68 @@ from sqlmodel import Session, select, and_, col
 from src.const import ARTIST_ID
 from src.db.db import get_session
 from src.db.tables import ChartType, SongChartSnapshot, Song, SongArtist
-from src.routes.models import ChartEntryResponse, ChartHistoryEntryResponse, ChartHistoryResponse, ChartHistorySnapshotResponse, ChartResponse, SongChartSnapshotResponse, SongResponse
+from src.routes.models import ChartEntryResponse, ChartHistoryEntryResponse, ChartHistoryResponse, ChartHistorySnapshotResponse, ChartResponse, SongChartResponse, SongChartSnapshotResponse, SongResponse
 
 
 router = APIRouter(prefix="/charts", tags=["charts"])
 
+
+@router.get(
+    "",
+    response_model=SongChartResponse,
+)
+def get_chart(
+    session: Session = Depends(get_session),
+    songId: str = Query(),
+):
+    latest_subquery = (
+        select(
+            SongChartSnapshot.chart_type,
+            col(SongChartSnapshot.rank_day),
+            SongChartSnapshot.rank_hour,
+        )
+        .distinct(col(SongChartSnapshot.chart_type))
+        .order_by(
+            SongChartSnapshot.chart_type,
+            col(SongChartSnapshot.rank_day).desc(),
+            col(SongChartSnapshot.rank_hour).desc(),
+        )
+        .subquery()
+    )
+    snapshots = session.exec(
+        select(SongChartSnapshot)
+        .where(
+            and_(
+                SongChartSnapshot.song_id == songId,
+                SongChartSnapshot.chart_type == latest_subquery.c.chart_type,
+                SongChartSnapshot.rank_day == latest_subquery.c.rank_day,
+                col(SongChartSnapshot.rank_hour).is_not_distinct_from(latest_subquery.c.rank_hour),
+            )
+        )
+        .distinct(col(SongChartSnapshot.chart_type))
+        .order_by(
+            col(SongChartSnapshot.chart_type),
+            col(SongChartSnapshot.fetched_at).desc(),
+        )
+    ).all()
+
+    return SongChartResponse(
+        song_id=songId,
+        snapshots=[
+            SongChartSnapshotResponse(
+                id=snapshot.id,
+                song_id=snapshot.song_id,
+                chart_type=snapshot.chart_type,
+                fetched_at=snapshot.fetched_at,
+                current_rank=snapshot.current_rank,
+                past_rank=snapshot.past_rank,
+                rank_gap=snapshot.rank_gap,
+                rank_type=snapshot.rank_type,
+                rank_day=snapshot.rank_day,
+                rank_hour=snapshot.rank_hour,
+            ) for snapshot in snapshots
+        ],
+    )
 
 @router.get(
     "/{chart_type}",

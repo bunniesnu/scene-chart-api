@@ -47,6 +47,11 @@ class ChartResponse(APIModel):
     entries: list[ChartEntryResponse]
 
 
+class SongChartResponse(APIModel):
+    song_id: str
+    snapshots: list[SongChartSnapshotResponse]
+
+
 class ChartHistorySnapshotResponse(APIModel):
     current_rank: int
     rank_day: date
